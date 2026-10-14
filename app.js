@@ -380,6 +380,7 @@
   var PROVIDERS = [
     { id: 'coop', name: 'Coop', url: function (q, l) { return 'https://www.coop.ch/' + (l === 'en' ? 'en' : 'de') + '/search/?text=' + q; } },
     { id: 'migros', name: 'Migros', url: function (q, l) { return 'https://www.migros.ch/' + (l === 'en' ? 'en' : 'de') + '/search?query=' + q; } },
+    { id: 'rio', name: 'Rio', url: function (q) { return 'https://www.rio-getraenke.ch/shop/alle-produkte?searchTerm=' + q; } },
     { id: 'ikea', name: 'IKEA', url: function (q, l) { return 'https://www.ikea.com/ch/' + (l === 'en' ? 'en' : 'de') + '/search/?q=' + q; } },
     { id: 'vivino', name: 'Vivino', url: function (q) { return 'https://www.vivino.com/search/wines?q=' + q; } }
   ];
