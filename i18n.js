@@ -34,7 +34,13 @@ window.APP_DICT = {
     navTasks: 'Tasks', tasksSub: 'Aufgaben für dich und andere mit Wunschtermin', taskNew: 'Task hinzufügen', taskEdit: 'Task bearbeiten', taskTitle: 'Aufgabe', taskNote: 'Notiz (optional)', taskAssignee: 'Zuweisen an', taskDue: 'Wunschtermin',
     taskMissing: 'Aufgabe, Person und Wunschtermin sind Pflicht.', taskSecMine: 'Für mich', taskSecFrom: 'Von mir', taskSecOther: 'Weitere (Admin)', taskDone: 'Erledigt', taskReopen: 'Wieder öffnen',
     taskFrom: 'Von {name}', taskTo: 'An {name}', taskFromTo: '{from} → {to}', taskDueOn: 'Wunschtermin: {date}', taskOverdue: 'Überfällig', taskEmpty: 'Keine Tasks.',
-    taskDeleteAsk: 'Task «{title}» löschen?', taskForbidden: 'Das darfst du bei diesem Task nicht ändern.', taskSelf: 'Für mich selbst', phoneShared: 'Diese Person nutzt den Login auch in einer anderen App. Die Nummer bitte dort ändern.'
+    taskDeleteAsk: 'Task «{title}» löschen?', taskForbidden: 'Das darfst du bei diesem Task nicht ändern.', taskSelf: 'Für mich selbst', phoneShared: 'Diese Person nutzt den Login auch in einer anderen App. Die Nummer bitte dort ändern.',
+    navShop: 'Einkauf', shopSub: 'Gemeinsame Einkaufslisten', shopNewList: 'Neue Liste', shopListName: 'Name der Liste', shopRename: 'Umbenennen',
+    shopDeleteListAsk: 'Liste «{name}» mit allen Artikeln löschen?', shopAddPh: 'Artikel hinzufügen …', shopAdd: 'Hinzufügen', shopCatalog: 'Vorschläge',
+    shopOnList: 'Auf der Liste', shopItem: 'Artikel', shopNote: 'Menge / Notiz (optional)', shopList: 'Liste', shopOpen: 'Zu kaufen', shopDoneSec: 'Erledigt',
+    shopClearDone: 'Erledigte entfernen', shopCleared: 'Erledigte entfernt', shopEmpty: 'Nichts zu kaufen.', shopNoLists: 'Es gibt noch keine Liste. Lege mit + eine an.',
+    shopAddedBy: 'Von {name}', shopItemMissing: 'Bitte einen Artikel eingeben.', shopDup: 'Ist schon auf der Liste.', shopEditItem: 'Artikel bearbeiten',
+    shopSearchAt: 'Suchen bei:', shopSearchEmpty: 'Zuerst oben einen Suchbegriff eingeben.'
   },
   en: {
     cancel: 'Cancel', confirm: 'Confirm', save: 'Save', saved: 'Saved', error: 'Error', edit: 'Edit', remove: 'Remove', removed: 'Removed', del: 'Delete',
@@ -70,7 +76,13 @@ window.APP_DICT = {
     navTasks: 'Tasks', tasksSub: 'Tasks for you and others, with a preferred date', taskNew: 'Add task', taskEdit: 'Edit task', taskTitle: 'Task', taskNote: 'Note (optional)', taskAssignee: 'Assign to', taskDue: 'Preferred date',
     taskMissing: 'Task, person and preferred date are required.', taskSecMine: 'For me', taskSecFrom: 'From me', taskSecOther: 'Others (admin)', taskDone: 'Done', taskReopen: 'Reopen',
     taskFrom: 'From {name}', taskTo: 'To {name}', taskFromTo: '{from} → {to}', taskDueOn: 'Preferred date: {date}', taskOverdue: 'Overdue', taskEmpty: 'No tasks.',
-    taskDeleteAsk: 'Delete task “{title}”?', taskForbidden: 'You cannot change this task.', taskSelf: 'For myself', phoneShared: 'This person also uses the login in another app. Please change the number there.'
+    taskDeleteAsk: 'Delete task “{title}”?', taskForbidden: 'You cannot change this task.', taskSelf: 'For myself', phoneShared: 'This person also uses the login in another app. Please change the number there.',
+    navShop: 'Shopping', shopSub: 'Shared shopping lists', shopNewList: 'New list', shopListName: 'List name', shopRename: 'Rename',
+    shopDeleteListAsk: 'Delete list «{name}» with all items?', shopAddPh: 'Add item …', shopAdd: 'Add', shopCatalog: 'Suggestions',
+    shopOnList: 'On the list', shopItem: 'Item', shopNote: 'Quantity / note (optional)', shopList: 'List', shopOpen: 'To buy', shopDoneSec: 'Done',
+    shopClearDone: 'Remove done', shopCleared: 'Done items removed', shopEmpty: 'Nothing to buy.', shopNoLists: 'There is no list yet. Create one with +.',
+    shopAddedBy: 'By {name}', shopItemMissing: 'Please enter an item.', shopDup: 'Already on the list.', shopEditItem: 'Edit item',
+    shopSearchAt: 'Search at:', shopSearchEmpty: 'Type a search term above first.'
   },
   nl: {
     cancel: 'Annuleren', confirm: 'Bevestigen', save: 'Opslaan', saved: 'Opgeslagen', error: 'Fout', edit: 'Bewerken', remove: 'Verwijderen', removed: 'Verwijderd', del: 'Verwijderen',
@@ -106,6 +118,12 @@ window.APP_DICT = {
     navTasks: 'Taken', tasksSub: 'Taken voor jou en anderen met een gewenste datum', taskNew: 'Taak toevoegen', taskEdit: 'Taak bewerken', taskTitle: 'Taak', taskNote: 'Notitie (optioneel)', taskAssignee: 'Toewijzen aan', taskDue: 'Gewenste datum',
     taskMissing: 'Taak, persoon en gewenste datum zijn verplicht.', taskSecMine: 'Voor mij', taskSecFrom: 'Van mij', taskSecOther: 'Overige (admin)', taskDone: 'Voltooid', taskReopen: 'Heropenen',
     taskFrom: 'Van {name}', taskTo: 'Aan {name}', taskFromTo: '{from} → {to}', taskDueOn: 'Gewenste datum: {date}', taskOverdue: 'Te laat', taskEmpty: 'Geen taken.',
-    taskDeleteAsk: 'Taak «{title}» verwijderen?', taskForbidden: 'Je mag deze taak niet wijzigen.', taskSelf: 'Voor mezelf', phoneShared: 'Deze persoon gebruikt de login ook in een andere app. Wijzig het nummer daar.'
+    taskDeleteAsk: 'Taak «{title}» verwijderen?', taskForbidden: 'Je mag deze taak niet wijzigen.', taskSelf: 'Voor mezelf', phoneShared: 'Deze persoon gebruikt de login ook in een andere app. Wijzig het nummer daar.',
+    navShop: 'Boodschappen', shopSub: 'Gedeelde boodschappenlijsten', shopNewList: 'Nieuwe lijst', shopListName: 'Naam van de lijst', shopRename: 'Hernoemen',
+    shopDeleteListAsk: 'Lijst «{name}» met alle artikelen verwijderen?', shopAddPh: 'Artikel toevoegen …', shopAdd: 'Toevoegen', shopCatalog: 'Suggesties',
+    shopOnList: 'Op de lijst', shopItem: 'Artikel', shopNote: 'Hoeveelheid / notitie (optioneel)', shopList: 'Lijst', shopOpen: 'Te kopen', shopDoneSec: 'Klaar',
+    shopClearDone: 'Afgevinkte verwijderen', shopCleared: 'Afgevinkte artikelen verwijderd', shopEmpty: 'Niets te kopen.', shopNoLists: 'Er is nog geen lijst. Maak er een met +.',
+    shopAddedBy: 'Door {name}', shopItemMissing: 'Voer een artikel in.', shopDup: 'Staat al op de lijst.', shopEditItem: 'Artikel bewerken',
+    shopSearchAt: 'Zoeken bij:', shopSearchEmpty: 'Typ eerst hierboven een zoekterm.'
   }
 };

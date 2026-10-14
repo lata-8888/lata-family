@@ -175,3 +175,16 @@ p{margin:0}
 .tchk svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
 .tchk:hover{border-color:var(--yes)}
 .tchk.on{background:var(--yes);border-color:var(--yes);color:#fff}
+
+/* Einkauf (Listenansicht) */
+.shoplists{margin-bottom:10px}
+.chip.pill{padding:8px 14px;font-weight:600;font-size:1rem}
+.chip.pill.on{background:var(--crown);color:#fff;border-color:var(--crown)}
+.chip.pill .cnt{opacity:.8;font-weight:500}
+.shopmng{margin:0 0 12px}
+.addbar{display:flex;gap:8px;margin:0 0 10px}
+.addbar input{flex:1;min-width:0;padding:12px 14px;border-radius:var(--r-btn);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--font);font-size:1.05rem}
+.addbar .btn{width:auto;flex:0 0 auto;padding:12px 16px}
+.shopsearch{align-items:center;margin:0 0 14px}
+.shopcat{font-size:1.15rem;color:var(--muted);margin:14px 0 2px}
+.shopi .btnrow{flex-direction:row}

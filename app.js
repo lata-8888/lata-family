@@ -82,7 +82,7 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], tab: 'events', sec: {}, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], items: [], shopList: null, tab: 'events', sec: { 'shop-cat': false, 'shop-done': false }, open: {}, phone: '' };
   var installEvt = null;
   var isAdmin = function () { return !!(S.me && S.me.is_admin); };
   var canManageEvents = function () { return !!(S.me && (S.me.is_admin || S.me.is_event_manager)); };   // Admin oder Event Manager
@@ -165,6 +165,7 @@
     gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 4.3c.4-1.8 2.9-1.8 3.4 0a1.7 1.7 0 0 0 2.6 1.1c1.5-.9 3.3.8 2.4 2.4a1.7 1.7 0 0 0 1 2.5c1.8.4 1.8 2.9 0 3.4a1.7 1.7 0 0 0-1 2.6c.9 1.5-.8 3.3-2.4 2.4a1.7 1.7 0 0 0-2.6 1c-.4 1.8-2.9 1.8-3.4 0a1.7 1.7 0 0 0-2.6-1c-1.5.9-3.3-.8-2.4-2.4a1.7 1.7 0 0 0-1-2.6c-1.8-.4-1.8-2.9 0-3.4a1.7 1.7 0 0 0 1-2.5c-.9-1.6.8-3.3 2.4-2.4c1 .6 2.3 0 2.6-1.1z"/><circle cx="12" cy="12" r="3"/></svg>',
     plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
+    cart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 10.5h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>',
     tasks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/></svg>',
     dots: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
     chev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'
@@ -179,10 +180,12 @@
       sb.from(T('event_responses')).select('*'),
       sb.rpc(F('app_design')),
       sb.rpc(F('app_language')),
-      sb.from(T('tasks')).select('*').order('due_date')
+      sb.from(T('tasks')).select('*').order('due_date'),
+      sb.from(T('shopping_lists')).select('*').order('created_at'),
+      sb.from(T('shopping_items')).select('*').order('created_at')
     ]);
     r.forEach(function (x) { if (x.error) throw x.error; });
-    S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data;
+    S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.items = r[7].data;
     applyDesign(r[3].data);
     S.defaultLang = LANGS.indexOf(r[4].data) > -1 ? r[4].data : 'de';
     try { localStorage.setItem('app-default-lang' + SFX, S.defaultLang); } catch (e) { /* ignorieren */ }
@@ -342,6 +345,108 @@
     }, L('saved'));
   }
 
+  /* ---------- Einkauf: gemeinsame Listen, Artikel aus Vorschlägen oder frei, Liste wählbar (Listenansicht, inspiriert von Bring!) ---------- */
+  var CATALOG = {
+    de: [
+      ['Obst & Gemüse', ['Äpfel', 'Bananen', 'Orangen', 'Zitronen', 'Trauben', 'Tomaten', 'Gurken', 'Karotten', 'Kartoffeln', 'Zwiebeln', 'Salat', 'Peperoni']],
+      ['Brot & Backwaren', ['Brot', 'Brötchen', 'Zopf', 'Croissants', 'Mehl', 'Hefe']],
+      ['Milch & Eier', ['Milch', 'Butter', 'Eier', 'Joghurt', 'Käse', 'Rahm', 'Quark']],
+      ['Fleisch & Fisch', ['Poulet', 'Hackfleisch', 'Schinken', 'Wurst', 'Speck', 'Lachs']],
+      ['Vorrat', ['Pasta', 'Reis', 'Öl', 'Zucker', 'Salz', 'Kaffee', 'Tee', 'Müesli', 'Konfitüre', 'Pelati']],
+      ['Getränke', ['Wasser', 'Süssgetränk', 'Saft', 'Wein', 'Bier']],
+      ['Haushalt', ['WC-Papier', 'Haushaltpapier', 'Spülmittel', 'Waschmittel', 'Seife', 'Zahnpasta', 'Kehrichtsäcke']]
+    ],
+    en: [
+      ['Fruit & vegetables', ['Apples', 'Bananas', 'Oranges', 'Lemons', 'Grapes', 'Tomatoes', 'Cucumbers', 'Carrots', 'Potatoes', 'Onions', 'Lettuce', 'Peppers']],
+      ['Bread & bakery', ['Bread', 'Rolls', 'Croissants', 'Flour', 'Yeast']],
+      ['Dairy & eggs', ['Milk', 'Butter', 'Eggs', 'Yoghurt', 'Cheese', 'Cream', 'Quark']],
+      ['Meat & fish', ['Chicken', 'Minced meat', 'Ham', 'Sausage', 'Bacon', 'Salmon']],
+      ['Pantry', ['Pasta', 'Rice', 'Oil', 'Sugar', 'Salt', 'Coffee', 'Tea', 'Muesli', 'Jam', 'Canned tomatoes']],
+      ['Drinks', ['Water', 'Soft drink', 'Juice', 'Wine', 'Beer']],
+      ['Household', ['Toilet paper', 'Kitchen roll', 'Dish soap', 'Laundry detergent', 'Soap', 'Toothpaste', 'Bin bags']]
+    ],
+    nl: [
+      ['Groente & fruit', ['Appels', 'Bananen', 'Sinaasappels', 'Citroenen', 'Druiven', 'Tomaten', 'Komkommers', 'Wortels', 'Aardappelen', 'Uien', 'Sla', 'Paprika']],
+      ['Brood & bakkerij', ['Brood', 'Broodjes', 'Croissants', 'Bloem', 'Gist']],
+      ['Zuivel & eieren', ['Melk', 'Boter', 'Eieren', 'Yoghurt', 'Kaas', 'Room', 'Kwark']],
+      ['Vlees & vis', ['Kip', 'Gehakt', 'Ham', 'Worst', 'Spek', 'Zalm']],
+      ['Voorraad', ['Pasta', 'Rijst', 'Olie', 'Suiker', 'Zout', 'Koffie', 'Thee', 'Muesli', 'Jam', 'Tomaten in blik']],
+      ['Dranken', ['Water', 'Frisdrank', 'Sap', 'Wijn', 'Bier']],
+      ['Huishouden', ['Toiletpapier', 'Keukenrol', 'Afwasmiddel', 'Wasmiddel', 'Zeep', 'Tandpasta', 'Vuilniszakken']]
+    ]
+  };
+  // Anbieter-Suche: öffnet die Suche des Anbieters mit dem eingegebenen Begriff (keine öffentliche Produkt-API nötig).
+  // Weitere Anbieter hier ergänzen: id, Name, Funktion (Suchbegriff, Sprache) → Adresse.
+  var PROVIDERS = [
+    { id: 'coop', name: 'Coop', url: function (q, l) { return 'https://www.coop.ch/' + (l === 'en' ? 'en' : 'de') + '/search/?text=' + q; } },
+    { id: 'migros', name: 'Migros', url: function (q, l) { return 'https://www.migros.ch/' + (l === 'en' ? 'en' : 'de') + '/search?query=' + q; } },
+    { id: 'ikea', name: 'IKEA', url: function (q, l) { return 'https://www.ikea.com/ch/' + (l === 'en' ? 'en' : 'de') + '/search/?q=' + q; } },
+    { id: 'vivino', name: 'Vivino', url: function (q) { return 'https://www.vivino.com/search/wines?q=' + q; } }
+  ];
+  function curList() {
+    var l = S.lists.filter(function (x) { return x.id === S.shopList; })[0];
+    if (!l && S.lists.length) { l = S.lists[0]; S.shopList = l.id; }
+    return l || null;
+  }
+  function viewShop() {
+    var lst = curList();
+    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1><p>' + esc(L('shopSub')) + '</p></div>' +
+      '<button type="button" class="hico addbtn" data-act="shop-newlist" aria-label="' + esc(L('shopNewList')) + '" title="' + esc(L('shopNewList')) + '">' + ICON.plus + '</button></div>';
+    if (!lst) return html + '<div class="empty"><p>' + esc(L('shopNoLists')) + '</p></div>';
+    // Listen als Auswahl-Zeile
+    html += '<div class="chips shoplists">' + S.lists.map(function (l) {
+      var n = S.items.filter(function (i) { return i.list_id === l.id && !i.done; }).length;
+      return '<button type="button" class="chip pill' + (l.id === lst.id ? ' on' : '') + '" data-act="shop-list" data-val="' + l.id + '" aria-pressed="' + (l.id === lst.id) + '">' + esc(l.name) + ' <span class="cnt">(' + n + ')</span></button>';
+    }).join('') + '</div>';
+    if (lst.created_by === S.me.id || isAdmin()) {
+      html += '<div class="btnrow shopmng"><button type="button" class="mini" data-act="shop-rename" data-id="' + lst.id + '">' + esc(L('shopRename')) + '</button>' +
+        '<button type="button" class="mini del" data-act="shop-dellist" data-id="' + lst.id + '">' + esc(L('del')) + '</button></div>';
+    }
+    // Artikel frei eingeben
+    html += '<form class="addbar" data-form="shopadd"><input name="item" maxlength="80" autocomplete="off" placeholder="' + esc(L('shopAddPh')) + '" aria-label="' + esc(L('shopItem')) + '">' +
+      '<button class="btn inline" type="submit">' + esc(L('shopAdd')) + '</button></form>';
+    html += '<div class="chips shopsearch"><span class="muted small">' + esc(L('shopSearchAt')) + '</span>' + PROVIDERS.map(function (p) {
+      return '<button type="button" class="chip" data-act="shop-search" data-val="' + p.id + '">' + esc(p.name) + ' ↗</button>';
+    }).join('') + '</div>';
+    var mine = S.items.filter(function (i) { return i.list_id === lst.id; });
+    var byDate = function (a, b) { return String(a.created_at).localeCompare(String(b.created_at)); };
+    var open = mine.filter(function (i) { return !i.done; }).sort(byDate), done = mine.filter(function (i) { return i.done; }).sort(byDate);
+    var row = function (i) {
+      var meta = [i.note, L('shopAddedBy', { name: nameOf(i.added_by) })].filter(Boolean).join(' · ');
+      return '<li class="trow shopi' + (i.done ? ' tdone' : '') + '"><button type="button" role="checkbox" class="tchk' + (i.done ? ' on' : '') + '" data-act="shop-done" data-id="' + i.id + '" aria-checked="' + i.done + '" aria-label="' + esc(i.name) + '">' + ICON.check + '</button>' +
+        '<div class="l"><b>' + esc(i.name) + '</b><span>' + esc(meta) + '</span></div>' +
+        '<div class="btnrow"><button type="button" class="mini" data-act="shop-edit" data-id="' + i.id + '">' + esc(L('edit')) + '</button>' +
+        '<button type="button" class="mini del" data-act="shop-del" data-id="' + i.id + '">' + esc(L('del')) + '</button></div></li>';
+    };
+    html += accordion('shop-open', L('shopOpen'), open.length, open.length ? '<ul class="list">' + open.map(row).join('') + '</ul>' : '<p class="muted">' + esc(L('shopEmpty')) + '</p>');
+    if (done.length) {
+      html += accordion('shop-done', L('shopDoneSec'), done.length, '<ul class="list">' + done.map(row).join('') + '</ul>' +
+        '<div class="btnrow shopmng"><button type="button" class="mini del" data-act="shop-clear">' + esc(L('shopClearDone')) + '</button></div>');
+    }
+    // Vorschläge nach Kategorie als Liste (keine Kacheln)
+    var onList = open.map(function (i) { return i.name.toLowerCase(); });
+    var cat = (CATALOG[lang] || CATALOG.de).map(function (c) {
+      return '<h3 class="shopcat">' + esc(c[0]) + '</h3><ul class="list">' + c[1].map(function (n) {
+        var has = onList.indexOf(n.toLowerCase()) > -1;
+        return '<li><div class="l"><b>' + esc(n) + '</b></div>' + (has ? '<span class="muted small">' + esc(L('shopOnList')) + '</span>'
+          : '<button type="button" class="mini" data-act="shop-pick" data-val="' + esc(n) + '">+ ' + esc(L('shopAdd')) + '</button>') + '</li>';
+      }).join('') + '</ul>';
+    }).join('');
+    html += accordion('shop-cat', L('shopCatalog'), null, cat);
+    return html;
+  }
+  async function shopAddItem(name, note) {
+    var lst = curList(); if (!lst) return;
+    name = String(name || '').trim();
+    if (!name) return toast(L('shopItemMissing'));
+    var dup = S.items.some(function (i) { return i.list_id === lst.id && !i.done && i.name.toLowerCase() === name.toLowerCase(); });
+    if (dup) return toast(L('shopDup'));
+    return act(async function () {
+      var r = await sb.from(T('shopping_items')).insert({ list_id: lst.id, name: name, note: note || null, added_by: S.me.id });
+      if (r.error) throw r.error;
+    });
+  }
+
   function viewProfile() {
     var opt = function (v, l) { return '<button type="button" class="segbtn' + (theme === v ? ' on' : '') + '" data-act="set-theme" data-val="' + v + '" aria-pressed="' + (theme === v) + '">' + esc(l) + '</button>'; };
     var standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
@@ -445,13 +550,13 @@
     if (S.step === 'loading') { app.innerHTML = '<main class="authwrap"><p class="muted">…</p></main>'; nav.hidden = true; return; }
     if (S.step === 'login') { app.innerHTML = viewLogin(); nav.hidden = true; return; }
     // Reihenfolge wie in der FBRO-App: Profil steht ganz rechts
-    var tabs = [{ id: 'events', label: L('navEvents'), icon: ICON.cal }, { id: 'tasks', label: L('navTasks'), icon: ICON.tasks }];
+    var tabs = [{ id: 'events', label: L('navEvents'), icon: ICON.cal }, { id: 'tasks', label: L('navTasks'), icon: ICON.tasks }, { id: 'shop', label: L('navShop'), icon: ICON.cart }];
     if (canManageEvents()) tabs.push({ id: 'admin', label: L('navAdmin'), icon: ICON.gear });
     tabs.push({ id: 'profile', label: L('navProfile'), icon: ICON.user });
     if (!tabs.some(function (t) { return t.id === S.tab; })) S.tab = 'events';
     var open = Array.prototype.map.call(document.querySelectorAll('details.ccel[open]'), function (d) { return d.dataset.k; });
     var banner = S.me.pin_changed ? '' : '<div class="pinbanner" role="status">' + esc(L('pinBanner')) + ' <button class="chip" data-act="goto" data-val="profile">' + esc(L('changePin')) + '</button></div>';
-    var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : S.tab === 'tasks' ? viewTasks() : viewEvents();
+    var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : S.tab === 'tasks' ? viewTasks() : S.tab === 'shop' ? viewShop() : viewEvents();
     app.innerHTML = banner + '<div class="shell">' + body + '</div>';
     nav.hidden = false;
     nav.innerHTML = tabs.map(function (t) {
@@ -466,6 +571,7 @@
     e.preventDefault();
     var g = function (n) { return f.elements[n] ? f.elements[n].value.trim() : ''; }, kind = f.dataset.form;
     if (kind === 'login') return handleLogin(g);
+    if (kind === 'shopadd') return shopAddItem(g('item'));
     if (kind === 'profile') {
       return act(async function () {
         var r = await sb.from(T('profiles')).update({ name: g('name'), language: g('language') }).eq('id', S.me.id); if (r.error) throw r.error;
@@ -513,6 +619,63 @@
       case 'goto': S.tab = v; render(); return window.scrollTo(0, 0);
       case 'sec': S.sec[id] = !(S.sec[id] !== false); return render();
       case 'who': S.open['ev:' + id] = !S.open['ev:' + id]; return render();
+      case 'shop-list': S.shopList = v; return render();
+      case 'shop-newlist': {
+        var nl = await askForm(L('shopNewList'), [{ name: 'name', label: L('shopListName') }]);
+        if (!nl || !nl.name) return;
+        return act(async function () {
+          var r = await sb.from(T('shopping_lists')).insert({ name: nl.name, created_by: S.me.id }).select().single();
+          if (r.error) throw r.error;
+          S.shopList = r.data.id;
+        });
+      }
+      case 'shop-rename': {
+        var rl = S.lists.filter(function (x) { return x.id === id; })[0]; if (!rl) return;
+        var rn = await askForm(L('shopRename'), [{ name: 'name', label: L('shopListName'), value: rl.name }]);
+        if (!rn || !rn.name) return;
+        return act(async function () { var r = await sb.from(T('shopping_lists')).update({ name: rn.name }).eq('id', id); if (r.error) throw r.error; }, L('saved'));
+      }
+      case 'shop-dellist': {
+        var dl = S.lists.filter(function (x) { return x.id === id; })[0];
+        if (dl && await askConfirm(L('del'), L('shopDeleteListAsk', { name: dl.name }), true))
+          return act(async function () { var r = await sb.from(T('shopping_lists')).delete().eq('id', id); if (r.error) throw r.error; S.shopList = null; }, L('removed'));
+        return;
+      }
+      case 'shop-pick': return shopAddItem(v);
+      case 'shop-done': {
+        var si = S.items.filter(function (x) { return x.id === id; })[0]; if (!si) return;
+        return act(async function () {
+          var r = await sb.from(T('shopping_items')).update({ done: !si.done, done_at: !si.done ? new Date().toISOString() : null }).eq('id', id);
+          if (r.error) throw r.error;
+        });
+      }
+      case 'shop-edit': {
+        var ei = S.items.filter(function (x) { return x.id === id; })[0]; if (!ei) return;
+        var ef = await askForm(L('shopEditItem'), [
+          { name: 'name', label: L('shopItem'), value: ei.name },
+          { name: 'note', label: L('shopNote'), value: ei.note },
+          { name: 'list_id', label: L('shopList'), type: 'select', value: ei.list_id, options: S.lists.map(function (l) { return { v: l.id, l: l.name }; }) }
+        ]);
+        if (!ef || !ef.name) return;
+        return act(async function () {
+          var r = await sb.from(T('shopping_items')).update({ name: ef.name, note: ef.note || null, list_id: ef.list_id }).eq('id', id);
+          if (r.error) throw r.error;
+        }, L('saved'));
+      }
+      case 'shop-del':
+        return act(async function () { var r = await sb.from(T('shopping_items')).delete().eq('id', id); if (r.error) throw r.error; });
+      case 'shop-clear': {
+        var cl = curList(); if (!cl) return;
+        return act(async function () { var r = await sb.from(T('shopping_items')).delete().eq('list_id', cl.id).eq('done', true); if (r.error) throw r.error; }, L('shopCleared'));
+      }
+      case 'shop-search': {
+        var inp = document.querySelector('form[data-form="shopadd"] input[name="item"]');
+        var q = inp ? inp.value.trim() : '';
+        if (!q) return toast(L('shopSearchEmpty'));
+        var pv = PROVIDERS.filter(function (p) { return p.id === v; })[0];
+        if (pv) window.open(pv.url(encodeURIComponent(q), lang), '_blank', 'noopener');
+        return;
+      }
       case 'task-new': return taskForm(null);
       case 'task-edit': return taskForm(S.tasks.filter(function (x) { return x.id === id; })[0]);
       case 'task-done': {
