@@ -1,4 +1,4 @@
-# Lata Family – Projektkontext für Claude Code
+# Family – Projektkontext für Claude Code
 
 Familien-App im gemeinsamen Supabase-Projekt
 

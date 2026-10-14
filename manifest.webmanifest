@@ -1,6 +1,6 @@
 {
-  "name": "Lata Family",
-  "short_name": "Lata",
+  "name": "Family",
+  "short_name": "Family",
   "description": "Familien-App im gemeinsamen Supabase-Projekt",
   "lang": "de-CH",
   "id": "./",
