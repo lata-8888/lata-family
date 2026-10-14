@@ -1,0 +1,7 @@
+node_modules/
+*.zip
+.DS_Store
+# Nie committen: Migrationen/Exporte mit Personendaten, Schlüssel
+*migration*.sql
+*export*.sql
+.env*
