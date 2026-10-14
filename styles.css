@@ -188,3 +188,8 @@ p{margin:0}
 .shopsearch{align-items:center;margin:0 0 14px}
 .shopcat{font-size:1.15rem;color:var(--muted);margin:14px 0 2px}
 .shopi .btnrow{flex-direction:row}
+
+/* Anmeldung: Landesvorwahl + Nummer */
+.phonerow{display:flex;gap:8px}
+.fld .phonerow select{flex:0 0 auto;width:auto;max-width:44%}
+.fld .phonerow input{flex:1;min-width:0}

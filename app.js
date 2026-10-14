@@ -62,10 +62,15 @@
 
   /* ---------- Telefon & PIN ---------- */
   // Akzeptiert 079 123 45 67, +41 79 …, 0041 79 …; gespeichert wird +41791234567.
-  function normPhone(raw) {
+  // Landesvorwahlen für die Anmeldung (Auswahl auf dem Login-Bildschirm); [Vorwahl, Länderkürzel]
+  var COUNTRIES = [['41', 'CH'], ['423', 'LI'], ['49', 'DE'], ['43', 'AT'], ['31', 'NL'], ['32', 'BE'], ['352', 'LU'], ['33', 'FR'], ['39', 'IT'], ['34', 'ES'], ['351', 'PT'], ['44', 'GB'], ['353', 'IE'], ['45', 'DK'], ['46', 'SE'], ['47', 'NO'], ['48', 'PL'], ['420', 'CZ'], ['36', 'HU'], ['30', 'GR'], ['90', 'TR'], ['381', 'RS'], ['385', 'HR'], ['386', 'SI'], ['1', 'US/CA'], ['55', 'BR'], ['61', 'AU']];
+  var ccStored = null;
+  try { ccStored = localStorage.getItem('app-cc' + SFX); } catch (e) { /* ignorieren */ }
+  var phoneCC = COUNTRIES.some(function (c) { return c[0] === ccStored; }) ? ccStored : (cfg.DEFAULT_COUNTRY_CODE || '41');
+  function normPhone(raw, cc) {
     var d = String(raw).replace(/\(0\)/g, '').replace(/[^\d+]/g, '');
     if (d.indexOf('00') === 0) d = '+' + d.slice(2);
-    else if (d.indexOf('0') === 0) d = '+' + (cfg.DEFAULT_COUNTRY_CODE || '41') + d.slice(1);
+    else if (d.indexOf('0') === 0) d = '+' + (cc || cfg.DEFAULT_COUNTRY_CODE || '41') + d.slice(1);
     else if (d.indexOf('+') !== 0) d = '+' + d;
     return /^\+\d{9,15}$/.test(d) ? d : null;
   }
@@ -205,7 +210,12 @@
 
   /* ---------- Anmeldung ---------- */
   async function handleLogin(g) {
-    var phone = normPhone(g('phone'));
+    var cc = g('cc') || phoneCC;
+    if (COUNTRIES.some(function (c) { return c[0] === cc; })) {
+      phoneCC = cc;
+      try { localStorage.setItem('app-cc' + SFX, cc); } catch (e) { /* ignorieren */ }
+    }
+    var phone = normPhone(g('phone'), phoneCC);
     S.phone = g('phone');
     if (!phone) { S.err = L('phoneInvalid'); return render(); }
     var custom = g('pin');
@@ -251,7 +261,11 @@
 
   function viewLogin() {
     return '<main class="authwrap"><div class="authcard"><h1>' + esc(cfg.APP_NAME || 'App') + '</h1><p class="muted">' + esc(L('loginHint')) + '</p>' +
-      '<form data-form="login">' + fld(L('phone'), 'phone', 'tel', S.phone, 'inputmode="tel" placeholder="079 123 45 67"') +
+      '<form data-form="login"><div class="fld"><span>' + esc(L('phone')) + '</span><div class="phonerow">' +
+      '<select name="cc" aria-label="' + esc(L('countryCode')) + '">' + COUNTRIES.map(function (c) {
+        return '<option value="' + c[0] + '"' + (c[0] === phoneCC ? ' selected' : '') + '>' + c[1] + ' +' + c[0] + '</option>';
+      }).join('') + '</select>' +
+      '<input name="phone" type="tel" value="' + esc(S.phone || '') + '" inputmode="tel" placeholder="79 123 45 67" autocomplete="tel-national" aria-label="' + esc(L('phone')) + '"></div></div>' +
       fld(L('pinOptional'), 'pin', 'password', '', 'inputmode="numeric" maxlength="6"') +
       (S.err ? '<p class="err" role="alert">' + esc(S.err) + '</p>' : '') +
       '<button class="btn" type="submit"' + (S.busy ? ' disabled' : '') + '>' + esc(L('login')) + '</button></form></div></main>';
