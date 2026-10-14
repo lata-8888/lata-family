@@ -2,7 +2,7 @@
 window.APP_DICT = {
   de: {
     cancel: 'Abbrechen', confirm: 'Bestätigen', save: 'Speichern', saved: 'Gespeichert', error: 'Fehler', edit: 'Bearbeiten', remove: 'Entfernen', removed: 'Entfernt', del: 'Löschen',
-    navEvents: 'Events', navProfile: 'Profil', navAdmin: 'Admin', setupTitle: 'Einrichtung',
+    navEvents: 'Family-Events', navProfile: 'Profil', navAdmin: 'Admin', setupTitle: 'Einrichtung',
     fullName: 'Vor- und Nachname', phone: 'Handynummer', phoneCountry: 'Land', phoneOther: 'Andere', pinOptional: 'PIN (leer = Standard-PIN)', login: 'Anmelden',
     loginHint: 'Melde dich mit deiner Handynummer an. Der Standard-PIN sind die letzten 6 Ziffern der Nummer.',
     phoneInvalid: 'Bitte eine gültige Handynummer eingeben.', pinExact: 'Der PIN muss aus genau 6 Ziffern bestehen.',
@@ -18,7 +18,7 @@ window.APP_DICT = {
     evUpcoming: 'Kommende Events', evPast: 'Vergangene Events', evEmpty: 'Aktuell sind keine Events geplant.', evYes: 'Dabei', evNo: 'Nicht dabei',
     evParticipants: 'Dabei ({n})', evDeclined: 'Nicht dabei ({n})', evNobody: 'Niemand',
     evNew: 'Event hinzufügen', evEdit: 'Event bearbeiten', evTitle: 'Titel', evPlace: 'Ort', evDate: 'Datum', evTime: 'Zeit', evRsvp: 'Teilnahme der User nötig (Zu-/Absage)', evMissing: 'Titel, Datum, Zeit und Ort sind Pflicht.',
-    evDeleteAsk: 'Event «{name}» löschen? Alle Antworten gehen verloren.', adminEvents: 'Events', evAdminEmpty: 'Noch keine Events.',
+    evDeleteAsk: 'Event «{name}» löschen? Alle Antworten gehen verloren.', adminEvents: 'Family-Events', evAdminEmpty: 'Noch keine Events.',
     addUser: 'Person hinzufügen', addUserNote: 'Die Person meldet sich mit der Handynummer an. Der PIN sind die letzten 6 Ziffern.', userAdded: 'Person hinzugefügt',
     makeAdmin: 'Zum Admin machen', revokeAdmin: 'Admin entziehen', resetPin: 'PIN zurücksetzen', resetPinAsk: 'PIN von {name} auf den Standard-PIN zurücksetzen?', pinReset: 'PIN zurückgesetzt',
     removeAsk: '{name} wirklich entfernen? Konto und Antworten werden gelöscht.', editPhoneNote: 'Bei neuer Nummer gilt wieder der Standard-PIN.',
@@ -44,7 +44,7 @@ window.APP_DICT = {
   },
   en: {
     cancel: 'Cancel', confirm: 'Confirm', save: 'Save', saved: 'Saved', error: 'Error', edit: 'Edit', remove: 'Remove', removed: 'Removed', del: 'Delete',
-    navEvents: 'Events', navProfile: 'Profile', navAdmin: 'Admin', setupTitle: 'Setup',
+    navEvents: 'Family-Events', navProfile: 'Profile', navAdmin: 'Admin', setupTitle: 'Setup',
     fullName: 'First and last name', phone: 'Mobile number', phoneCountry: 'Country', phoneOther: 'Other', pinOptional: 'PIN (empty = default PIN)', login: 'Log in',
     loginHint: 'Log in with your mobile number. The default PIN is the last 6 digits of the number.',
     phoneInvalid: 'Please enter a valid mobile number.', pinExact: 'The PIN must consist of exactly 6 digits.',
@@ -60,7 +60,7 @@ window.APP_DICT = {
     evUpcoming: 'Upcoming events', evPast: 'Past events', evEmpty: 'No events planned at the moment.', evYes: "I'm in", evNo: "I'm not in",
     evParticipants: "I'm in ({n})", evDeclined: "I'm not in ({n})", evNobody: 'Nobody',
     evNew: 'Add event', evEdit: 'Edit event', evTitle: 'Title', evPlace: 'Place', evDate: 'Date', evTime: 'Time', evRsvp: "Attendance required (I'm in / I'm not in)", evMissing: 'Title, date, time and place are required.',
-    evDeleteAsk: 'Delete event “{name}”? All answers will be lost.', adminEvents: 'Events', evAdminEmpty: 'No events yet.',
+    evDeleteAsk: 'Delete event “{name}”? All answers will be lost.', adminEvents: 'Family-Events', evAdminEmpty: 'No events yet.',
     addUser: 'Add person', addUserNote: 'The person logs in with their mobile number. The PIN is the last 6 digits.', userAdded: 'Person added',
     makeAdmin: 'Make admin', revokeAdmin: 'Revoke admin', resetPin: 'Reset PIN', resetPinAsk: 'Reset the PIN of {name} to the default PIN?', pinReset: 'PIN reset',
     removeAsk: 'Really remove {name}? Account and answers will be deleted.', editPhoneNote: 'With a new number the default PIN applies again.',
@@ -86,7 +86,7 @@ window.APP_DICT = {
   },
   nl: {
     cancel: 'Annuleren', confirm: 'Bevestigen', save: 'Opslaan', saved: 'Opgeslagen', error: 'Fout', edit: 'Bewerken', remove: 'Verwijderen', removed: 'Verwijderd', del: 'Verwijderen',
-    navEvents: 'Events', navProfile: 'Profiel', navAdmin: 'Admin', setupTitle: 'Configuratie',
+    navEvents: 'Family-Events', navProfile: 'Profiel', navAdmin: 'Admin', setupTitle: 'Configuratie',
     fullName: 'Voor- en achternaam', phone: 'Mobiel nummer', phoneCountry: 'Land', phoneOther: 'Overig', pinOptional: 'PIN (leeg = standaard-PIN)', login: 'Inloggen',
     loginHint: 'Log in met je mobiele nummer. De standaard-PIN zijn de laatste 6 cijfers van het nummer.',
     phoneInvalid: 'Voer een geldig mobiel nummer in.', pinExact: 'De PIN moet uit precies 6 cijfers bestaan.',
@@ -102,7 +102,7 @@ window.APP_DICT = {
     evUpcoming: 'Komende events', evPast: 'Afgelopen events', evEmpty: 'Er zijn momenteel geen events gepland.', evYes: 'Ik ben erbij', evNo: 'Ik ben er niet bij',
     evParticipants: 'Erbij ({n})', evDeclined: 'Er niet bij ({n})', evNobody: 'Niemand',
     evNew: 'Event toevoegen', evEdit: 'Event bewerken', evTitle: 'Titel', evPlace: 'Plaats', evDate: 'Datum', evTime: 'Tijd', evRsvp: 'Deelname van gebruikers nodig (aan-/afmelden)', evMissing: 'Titel, datum, tijd en plaats zijn verplicht.',
-    evDeleteAsk: 'Event «{name}» verwijderen? Alle antwoorden gaan verloren.', adminEvents: 'Events', evAdminEmpty: 'Nog geen events.',
+    evDeleteAsk: 'Event «{name}» verwijderen? Alle antwoorden gaan verloren.', adminEvents: 'Family-Events', evAdminEmpty: 'Nog geen events.',
     addUser: 'Persoon toevoegen', addUserNote: 'De persoon logt in met het mobiele nummer. De PIN zijn de laatste 6 cijfers.', userAdded: 'Persoon toegevoegd',
     makeAdmin: 'Admin maken', revokeAdmin: 'Admin intrekken', resetPin: 'PIN resetten', resetPinAsk: 'PIN van {name} resetten naar de standaard-PIN?', pinReset: 'PIN gereset',
     removeAsk: '{name} echt verwijderen? Account en antwoorden worden gewist.', editPhoneNote: 'Bij een nieuw nummer geldt weer de standaard-PIN.',
