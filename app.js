@@ -127,7 +127,7 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], items: [], shopList: null, tab: 'events', sec: { 'shop-cat': false, 'shop-done': false }, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], needs: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-hist': false }, open: {}, phone: '' };
   var installEvt = null;
   var isAdmin = function () { return !!(S.me && S.me.is_admin); };
   var canManageEvents = function () { return !!(S.me && (S.me.is_admin || S.me.is_event_manager)); };   // Admin oder Event Manager
@@ -212,6 +212,7 @@
     plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
     cart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 10.5h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     tasks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/></svg>',
     dots: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
     chev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'
@@ -220,6 +221,7 @@
   /* ---------- Daten laden & Live-Aktualisierung ---------- */
   async function loadAll() {
     var uid = S.session.user.id;
+    try { await sb.rpc(F('run_recurring')); } catch (e) { /* ignorieren */ }
     var r = await Promise.all([
       sb.from(T('profiles')).select('*').order('name'),
       sb.from(T('events')).select('*').order('starts_at'),
@@ -227,11 +229,12 @@
       sb.rpc(F('app_design')),
       sb.rpc(F('app_language')),
       sb.from(T('tasks')).select('*').order('due_date'),
-      sb.from(T('shopping_lists')).select('*').order('created_at'),
-      sb.from(T('shopping_items')).select('*').order('created_at')
+      sb.from(T('shop_lists')).select('*').order('created_at'),
+      sb.from(T('needs')).select('*').order('created_at'),
+      sb.from(T('recurring_tasks')).select('*').order('created_at')
     ]);
     r.forEach(function (x) { if (x.error) throw x.error; });
-    S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.items = r[7].data;
+    S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.needs = r[7].data; S.rules = r[8].data;
     applyDesign(r[3].data);
     S.defaultLang = LANGS.indexOf(r[4].data) > -1 ? r[4].data : 'de';
     try { localStorage.setItem('app-default-lang' + SFX, S.defaultLang); } catch (e) { /* ignorieren */ }
@@ -391,107 +394,96 @@
     }, L('saved'));
   }
 
-  /* ---------- Einkauf: gemeinsame Listen, Artikel aus Vorschlägen oder frei, Liste wählbar (Listenansicht, inspiriert von Bring!) ---------- */
-  var CATALOG = {
-    de: [
-      ['Obst & Gemüse', ['Äpfel', 'Bananen', 'Orangen', 'Zitronen', 'Trauben', 'Tomaten', 'Gurken', 'Karotten', 'Kartoffeln', 'Zwiebeln', 'Salat', 'Peperoni']],
-      ['Brot & Backwaren', ['Brot', 'Brötchen', 'Zopf', 'Croissants', 'Mehl', 'Hefe']],
-      ['Milch & Eier', ['Milch', 'Butter', 'Eier', 'Joghurt', 'Käse', 'Rahm', 'Quark']],
-      ['Fleisch & Fisch', ['Poulet', 'Hackfleisch', 'Schinken', 'Wurst', 'Speck', 'Lachs']],
-      ['Vorrat', ['Pasta', 'Reis', 'Öl', 'Zucker', 'Salz', 'Kaffee', 'Tee', 'Müesli', 'Konfitüre', 'Pelati']],
-      ['Getränke', ['Wasser', 'Süssgetränk', 'Saft', 'Wein', 'Bier']],
-      ['Haushalt', ['WC-Papier', 'Haushaltpapier', 'Spülmittel', 'Waschmittel', 'Seife', 'Zahnpasta', 'Kehrichtsäcke']]
-    ],
-    en: [
-      ['Fruit & vegetables', ['Apples', 'Bananas', 'Oranges', 'Lemons', 'Grapes', 'Tomatoes', 'Cucumbers', 'Carrots', 'Potatoes', 'Onions', 'Lettuce', 'Peppers']],
-      ['Bread & bakery', ['Bread', 'Rolls', 'Croissants', 'Flour', 'Yeast']],
-      ['Dairy & eggs', ['Milk', 'Butter', 'Eggs', 'Yoghurt', 'Cheese', 'Cream', 'Quark']],
-      ['Meat & fish', ['Chicken', 'Minced meat', 'Ham', 'Sausage', 'Bacon', 'Salmon']],
-      ['Pantry', ['Pasta', 'Rice', 'Oil', 'Sugar', 'Salt', 'Coffee', 'Tea', 'Muesli', 'Jam', 'Canned tomatoes']],
-      ['Drinks', ['Water', 'Soft drink', 'Juice', 'Wine', 'Beer']],
-      ['Household', ['Toilet paper', 'Kitchen roll', 'Dish soap', 'Laundry detergent', 'Soap', 'Toothpaste', 'Bin bags']]
-    ],
-    nl: [
-      ['Groente & fruit', ['Appels', 'Bananen', 'Sinaasappels', 'Citroenen', 'Druiven', 'Tomaten', 'Komkommers', 'Wortels', 'Aardappelen', 'Uien', 'Sla', 'Paprika']],
-      ['Brood & bakkerij', ['Brood', 'Broodjes', 'Croissants', 'Bloem', 'Gist']],
-      ['Zuivel & eieren', ['Melk', 'Boter', 'Eieren', 'Yoghurt', 'Kaas', 'Room', 'Kwark']],
-      ['Vlees & vis', ['Kip', 'Gehakt', 'Ham', 'Worst', 'Spek', 'Zalm']],
-      ['Voorraad', ['Pasta', 'Rijst', 'Olie', 'Suiker', 'Zout', 'Koffie', 'Thee', 'Muesli', 'Jam', 'Tomaten in blik']],
-      ['Dranken', ['Water', 'Frisdrank', 'Sap', 'Wijn', 'Bier']],
-      ['Huishouden', ['Toiletpapier', 'Keukenrol', 'Afwasmiddel', 'Wasmiddel', 'Zeep', 'Tandpasta', 'Vuilniszakken']]
-    ]
-  };
-  // Anbieter-Suche: öffnet die Suche des Anbieters mit dem eingegebenen Begriff (keine öffentliche Produkt-API nötig).
-  // Weitere Anbieter hier ergänzen: id, Name, Funktion (Suchbegriff, Sprache) → Adresse.
-  var PROVIDERS = [
-    { id: 'coop', name: 'Coop', url: function (q, l) { return 'https://www.coop.ch/' + (l === 'en' ? 'en' : 'de') + '/search/?text=' + q; } },
-    { id: 'migros', name: 'Migros', url: function (q, l) { return 'https://www.migros.ch/' + (l === 'en' ? 'en' : 'de') + '/search?query=' + q; } },
-    { id: 'rio', name: 'Rio', url: function (q) { return 'https://www.rio-getraenke.ch/shop/alle-produkte?searchTerm=' + q; } },
-    { id: 'ikea', name: 'IKEA', url: function (q, l) { return 'https://www.ikea.com/ch/' + (l === 'en' ? 'en' : 'de') + '/search/?q=' + q; } },
-    { id: 'vivino', name: 'Vivino', url: function (q) { return 'https://www.vivino.com/search/wines?q=' + q; } }
-  ];
-  function curList() {
-    var l = S.lists.filter(function (x) { return x.id === S.shopList; })[0];
-    if (!l && S.lists.length) { l = S.lists[0]; S.shopList = l.id; }
-    return l || null;
+  /* ---------- Einkauf: «Was ich brauche» (eigene Produkte, Historie) und «Einkaufslisten» (gemeinsam oder privat) ---------- */
+  function listById(id) { return S.lists.filter(function (x) { return x.id === id; })[0] || null; }
+  function listOptions(withNone) {
+    var o = withNone ? [{ v: '', l: L('shNoList') }] : [];
+    return o.concat(S.lists.map(function (l) { return { v: l.id, l: l.name + (l.is_private ? ' (' + L('shPrivTag').toLowerCase() + ')' : '') }; }));
   }
+  function lockIcon(l) { return l && l.is_private ? '<span class="lock" title="' + esc(L('shPrivTag')) + '">' + ICON.lock + '</span>' : ''; }
+  function needMeta(n, showOwner, showList) {
+    var parts = [];
+    if (n.note) parts.push(esc(n.note));
+    if (showList) { var l = listById(n.list_id); parts.push(l ? lockIcon(l) + esc(l.name) : esc(L('shNoList'))); }
+    if (showOwner && n.owner_id !== S.me.id) parts.push(esc(L('shBy', { name: nameOf(n.owner_id) })));
+    return parts.join(' · ');
+  }
+  // Zeile eines Produkts; mode: need (aktiv, meine) | hist (Historie) | list (in einer Liste) | none (noch in keiner Liste)
+  function needRow(n, mode) {
+    var mine = n.owner_id === S.me.id;
+    var check = (mode === 'need' || mode === 'list')
+      ? '<button type="button" role="checkbox" class="tchk" data-act="need-done" data-id="' + n.id + '" aria-checked="false" aria-label="' + esc(L('shBought')) + '" title="' + esc(L('shBought')) + '">' + ICON.check + '</button>' : '';
+    var btns = '';
+    if (mode === 'hist') btns += '<button type="button" class="mini" data-act="need-react" data-id="' + n.id + '">' + esc(L('shReactivate')) + '</button>';
+    if (mode === 'none') btns += '<button type="button" class="mini" data-act="need-assign" data-id="' + n.id + '">' + esc(L('shAssign')) + '</button>';
+    if (mode === 'list') btns += '<button type="button" class="mini" data-act="need-unlist" data-id="' + n.id + '">' + esc(L('shUnlist')) + '</button>';
+    if (mine && mode !== 'hist') btns += '<button type="button" class="mini" data-act="need-edit" data-id="' + n.id + '">' + esc(L('edit')) + '</button>';
+    if (mine && (mode === 'need' || mode === 'hist')) btns += '<button type="button" class="mini del" data-act="need-del" data-id="' + n.id + '">' + esc(L('del')) + '</button>';
+    return '<li class="trow shopi' + (mode === 'hist' ? ' tdone' : '') + '">' + check +
+      '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none', mode === 'need' || mode === 'hist') + '</span></div>' +
+      '<div class="btnrow">' + btns + '</div></li>';
+  }
+  function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
   function viewShop() {
-    var lst = curList();
+    var needView = S.shopView !== 'lists';
     var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1><p>' + esc(L('shopSub')) + '</p></div>' +
-      '<button type="button" class="hico addbtn" data-act="shop-newlist" aria-label="' + esc(L('shopNewList')) + '" title="' + esc(L('shopNewList')) + '">' + ICON.plus + '</button></div>';
-    if (!lst) return html + '<div class="empty"><p>' + esc(L('shopNoLists')) + '</p></div>';
-    // Listen als Auswahl-Zeile
-    html += '<div class="chips shoplists">' + S.lists.map(function (l) {
-      var n = S.items.filter(function (i) { return i.list_id === l.id && !i.done; }).length;
-      return '<button type="button" class="chip pill' + (l.id === lst.id ? ' on' : '') + '" data-act="shop-list" data-val="' + l.id + '" aria-pressed="' + (l.id === lst.id) + '">' + esc(l.name) + ' <span class="cnt">(' + n + ')</span></button>';
-    }).join('') + '</div>';
-    if (lst.created_by === S.me.id || isAdmin()) {
-      html += '<div class="btnrow shopmng"><button type="button" class="mini" data-act="shop-rename" data-id="' + lst.id + '">' + esc(L('shopRename')) + '</button>' +
-        '<button type="button" class="mini del" data-act="shop-dellist" data-id="' + lst.id + '">' + esc(L('del')) + '</button></div>';
-    }
-    // Artikel frei eingeben
-    html += '<form class="addbar" data-form="shopadd"><input name="item" maxlength="80" autocomplete="off" placeholder="' + esc(L('shopAddPh')) + '" aria-label="' + esc(L('shopItem')) + '">' +
-      '<button class="btn inline" type="submit">' + esc(L('shopAdd')) + '</button></form>';
-    html += '<div class="chips shopsearch"><span class="muted small">' + esc(L('shopSearchAt')) + '</span>' + PROVIDERS.map(function (p) {
-      return '<button type="button" class="chip" data-act="shop-search" data-val="' + p.id + '">' + esc(p.name) + ' ↗</button>';
-    }).join('') + '</div>';
-    var mine = S.items.filter(function (i) { return i.list_id === lst.id; });
-    var byDate = function (a, b) { return String(a.created_at).localeCompare(String(b.created_at)); };
-    var open = mine.filter(function (i) { return !i.done; }).sort(byDate), done = mine.filter(function (i) { return i.done; }).sort(byDate);
-    var row = function (i) {
-      var meta = [i.note, L('shopAddedBy', { name: nameOf(i.added_by) })].filter(Boolean).join(' · ');
-      return '<li class="trow shopi' + (i.done ? ' tdone' : '') + '"><button type="button" role="checkbox" class="tchk' + (i.done ? ' on' : '') + '" data-act="shop-done" data-id="' + i.id + '" aria-checked="' + i.done + '" aria-label="' + esc(i.name) + '">' + ICON.check + '</button>' +
-        '<div class="l"><b>' + esc(i.name) + '</b><span>' + esc(meta) + '</span></div>' +
-        '<div class="btnrow"><button type="button" class="mini" data-act="shop-edit" data-id="' + i.id + '">' + esc(L('edit')) + '</button>' +
-        '<button type="button" class="mini del" data-act="shop-del" data-id="' + i.id + '">' + esc(L('del')) + '</button></div></li>';
-    };
-    html += accordion('shop-open', L('shopOpen'), open.length, open.length ? '<ul class="list">' + open.map(row).join('') + '</ul>' : '<p class="muted">' + esc(L('shopEmpty')) + '</p>');
-    if (done.length) {
-      html += accordion('shop-done', L('shopDoneSec'), done.length, '<ul class="list">' + done.map(row).join('') + '</ul>' +
-        '<div class="btnrow shopmng"><button type="button" class="mini del" data-act="shop-clear">' + esc(L('shopClearDone')) + '</button></div>');
-    }
-    // Vorschläge nach Kategorie als Liste (keine Kacheln)
-    var onList = open.map(function (i) { return i.name.toLowerCase(); });
-    var cat = (CATALOG[lang] || CATALOG.de).map(function (c) {
-      return '<h3 class="shopcat">' + esc(c[0]) + '</h3><ul class="list">' + c[1].map(function (n) {
-        var has = onList.indexOf(n.toLowerCase()) > -1;
-        return '<li><div class="l"><b>' + esc(n) + '</b></div>' + (has ? '<span class="muted small">' + esc(L('shopOnList')) + '</span>'
-          : '<button type="button" class="mini" data-act="shop-pick" data-val="' + esc(n) + '">+ ' + esc(L('shopAdd')) + '</button>') + '</li>';
-      }).join('') + '</ul>';
-    }).join('');
-    html += accordion('shop-cat', L('shopCatalog'), null, cat);
+      (needView ? '' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shNewList')) + '" title="' + esc(L('shNewList')) + '">' + ICON.plus + '</button>') + '</div>';
+    var seg = function (v, label) { return '<button type="button" class="segbtn' + ((v === 'need') === needView ? ' on' : '') + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
+    html += '<div class="segctl shopseg">' + seg('need', L('shNeed')) + seg('lists', L('shLists')) + '</div>';
+    return html + (needView ? viewNeeds() : viewLists());
+  }
+  function viewNeeds() {
+    var mine = S.needs.filter(function (n) { return n.owner_id === S.me.id; });
+    var byName = function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); };
+    var open = mine.filter(function (n) { return n.active; }).sort(byName);
+    var hist = mine.filter(function (n) { return !n.active; }).sort(function (a, b) { return String(b.done_at || '').localeCompare(String(a.done_at || '')); });
+    var html = '<form class="addbar" data-form="needadd"><input name="item" list="needhist" maxlength="80" autocomplete="off" placeholder="' + esc(L('shAddPh')) + '" aria-label="' + esc(L('shName')) + '">' +
+      '<datalist id="needhist">' + hist.map(function (n) { return '<option value="' + esc(n.name) + '"></option>'; }).join('') + '</datalist>' +
+      '<button class="btn inline" type="submit">' + esc(L('shAdd')) + '</button></form>';
+    html += accordion('need-open', L('shNeeded'), open.length, ulOf(open.map(function (n) { return needRow(n, 'need'); }), 'shEmpty'));
+    html += accordion('need-hist', L('shHistory'), hist.length, ulOf(hist.map(function (n) { return needRow(n, 'hist'); }), 'shHistoryEmpty'));
     return html;
   }
-  async function shopAddItem(name, note) {
-    var lst = curList(); if (!lst) return;
-    name = String(name || '').trim();
-    if (!name) return toast(L('shopItemMissing'));
-    var dup = S.items.some(function (i) { return i.list_id === lst.id && !i.done && i.name.toLowerCase() === name.toLowerCase(); });
-    if (dup) return toast(L('shopDup'));
-    return act(async function () {
-      var r = await sb.from(T('shopping_items')).insert({ list_id: lst.id, name: name, note: note || null, added_by: S.me.id });
-      if (r.error) throw r.error;
+  function viewLists() {
+    var active = S.needs.filter(function (n) { return n.active; });
+    var none = active.filter(function (n) { return !n.list_id; });
+    var html = accordion('lst-none', L('shNoList'), none.length, ulOf(none.map(function (n) { return needRow(n, 'none'); }), 'shEmpty'));
+    if (!S.lists.length) html += '<div class="empty"><p>' + esc(L('shNoLists')) + '</p></div>';
+    S.lists.forEach(function (l) {
+      var items = active.filter(function (n) { return n.list_id === l.id; });
+      var mgmt = l.owner_id === S.me.id
+        ? '<div class="btnrow shopmng"><button type="button" class="mini" data-act="list-rename" data-id="' + l.id + '">' + esc(L('shRename')) + '</button>' +
+          '<button type="button" class="mini" data-act="list-priv" data-id="' + l.id + '">' + esc(l.is_private ? L('shMakeShared') : L('shMakePrivate')) + '</button>' +
+          '<button type="button" class="mini del" data-act="list-del" data-id="' + l.id + '">' + esc(L('del')) + '</button></div>' : '';
+      var open = S.sec['lst-' + l.id] !== false;
+      html += '<section class="acc' + (l.is_private ? ' privlist' : '') + '"><div class="acch">' +
+        '<button type="button" class="acct" data-act="sec" data-id="lst-' + l.id + '" aria-expanded="' + open + '">' + lockIcon(l) + esc(l.name) + ' <span class="cnt">(' + items.length + ')</span>' +
+        (l.is_private ? '<span class="privtag">' + esc(L('shPrivTag')) + '</span>' : '') + '</button>' +
+        '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
+        (open ? '<div class="accbody">' + ulOf(items.map(function (n) { return needRow(n, 'list'); }), 'shEmpty') + mgmt + '</div>' : '') + '</section>';
     });
+    return html;
+  }
+  // Produkt hinzufügen: ein früheres Produkt gleichen Namens wird reaktiviert statt doppelt angelegt
+  async function needAdd(name) {
+    name = String(name || '').trim();
+    if (!name) return toast(L('shMissing'));
+    var low = name.toLowerCase();
+    var same = S.needs.filter(function (n) { return n.owner_id === S.me.id && n.name.toLowerCase() === low; });
+    if (same.some(function (n) { return n.active; })) return toast(L('shAlready'));
+    var old = same.filter(function (n) { return !n.active; })[0];
+    return act(async function () {
+      var r = old ? await sb.from(T('needs')).update({ active: true }).eq('id', old.id)
+        : await sb.from(T('needs')).insert({ name: name, owner_id: S.me.id });
+      if (r.error) throw r.error;
+    }, old ? L('shReactivated') : null);
+  }
+  function needEditForm(n) {
+    return askForm(L('shEditNeed'), [
+      { name: 'name', label: L('shName'), value: n.name },
+      { name: 'note', label: L('shNote'), value: n.note },
+      { name: 'list_id', label: L('shList'), type: 'select', value: n.list_id || '', options: listOptions(true) }
+    ]);
   }
 
   function viewProfile() {
@@ -512,6 +504,47 @@
       '<button class="btn" type="submit">' + esc(L('changePin')) + '</button></form></section>' +
       '<section class="card"><h2>' + esc(L('installTitle')) + '</h2>' + install + '</section>' +
       '<section class="card"><button class="btn ghost" data-act="logout">' + esc(L('logout')) + '</button></section>';
+  }
+
+  /* ---------- Wiederkehrende Tasks (nur Admin): werden beim Öffnen der App automatisch als Task erzeugt ---------- */
+  function weekdayName(n, style) { return new Date(2024, 0, n).toLocaleDateString(LOCALE[lang], { weekday: style || 'long' }); }   // 1.1.2024 war ein Montag
+  function recurText(r) {
+    if (r.freq === 'daily') return L('recDaily');
+    if (r.freq === 'weekly') return L('recEveryWeekly', { day: weekdayName(r.weekday || 1) });
+    return L('recEveryMonthly', { day: r.month_day || 1 });
+  }
+  async function recurForm(r) {
+    var days = [1, 2, 3, 4, 5, 6, 7].map(function (n) { return { v: String(n), l: weekdayName(n) }; });
+    var f = await askForm(r ? L('recurEdit') : L('recurNew'), [
+      { name: 'title', label: L('taskTitle'), value: r && r.title },
+      { name: 'assigned_to', label: L('taskAssignee'), type: 'select', value: r ? r.assigned_to : S.me.id, options: S.members.map(function (m) { return { v: m.id, l: m.name + (m.id === S.me.id ? ' (' + L('you') + ')' : '') }; }) },
+      { name: 'freq', label: L('recFreq'), type: 'select', value: r ? r.freq : 'weekly', options: [{ v: 'daily', l: L('recDaily') }, { v: 'weekly', l: L('recWeekly') }, { v: 'monthly', l: L('recMonthly') }] },
+      { name: 'weekday', label: L('recWeekday'), type: 'select', value: String((r && r.weekday) || 1), options: days },
+      { name: 'month_day', label: L('recMonthDay'), type: 'number', value: String((r && r.month_day) || 1) },
+      { name: 'start_date', label: L('recStart'), type: 'date', value: r ? r.start_date : today() },
+      { name: 'note', label: L('taskNote'), value: r && r.note }
+    ]);
+    if (!f) return;
+    var md = Math.min(28, Math.max(1, parseInt(f.month_day, 10) || 1));
+    if (!f.title || !f.assigned_to || !f.start_date) return toast(L('recMissing'));
+    var row = { title: f.title, note: f.note || null, assigned_to: f.assigned_to, freq: f.freq,
+      weekday: f.freq === 'weekly' ? parseInt(f.weekday, 10) : null, month_day: f.freq === 'monthly' ? md : null, start_date: f.start_date };
+    if (!r) row.created_by = S.me.id;
+    return act(async function () {
+      var q = r ? await sb.from(T('recurring_tasks')).update(row).eq('id', r.id) : await sb.from(T('recurring_tasks')).insert(row);
+      if (q.error) throw q.error;
+    }, L('saved'));
+  }
+  function recurBody() {
+    var rows = S.rules.map(function (r) {
+      return '<li class="trow' + (r.active ? '' : ' tdone') + '"><div class="l"><b>' + esc(r.title) + '</b>' +
+        '<span>' + esc(recurText(r)) + ' · ' + esc(nameOf(r.assigned_to)) + '</span>' +
+        '<span class="tnote">' + esc(r.active ? L('recNext', { date: fmtDue(r.next_due) }) : L('recPaused')) + '</span></div>' +
+        '<div class="btnrow"><button type="button" class="mini" data-act="rec-toggle" data-id="' + r.id + '">' + esc(r.active ? L('recPause') : L('recResume')) + '</button>' +
+        '<button type="button" class="mini" data-act="rec-edit" data-id="' + r.id + '">' + esc(L('edit')) + '</button>' +
+        '<button type="button" class="mini del" data-act="rec-del" data-id="' + r.id + '">' + esc(L('del')) + '</button></div></li>';
+    });
+    return '<p class="muted small" style="margin-bottom:8px">' + esc(L('recHint')) + '</p>' + ulOf(rows, 'recEmpty');
   }
 
   function viewAdmin() {
@@ -545,6 +578,7 @@
     var users = S.members.filter(function (m) { return !m.is_guest; }), guests = S.members.filter(function (m) { return m.is_guest; });
     var mbBody = group('g-user', L('grpUsers'), users, ICON.user) + group('g-guest', L('grpGuests'), guests, ICON.guest);
     html += accordion('members', L('secMembers'), S.members.length, mbBody, 'add-user', L('addUser'));
+    html += accordion('recur', L('recurTitle'), S.rules.length, recurBody(), 'rec-new', L('recurNew'));
     // Design der ganzen App (nur Admins)
     var dsg = DESIGNS.map(function (d) {
       var on = d.id === design;
@@ -621,7 +655,7 @@
       return f.elements[n] ? f.elements[n].value.trim() : '';
     }, kind = f.dataset.form;
     if (kind === 'login') return handleLogin(g);
-    if (kind === 'shopadd') return shopAddItem(g('item'));
+    if (kind === 'needadd') return needAdd(g('item'));
     if (kind === 'profile') {
       return act(async function () {
         var r = await sb.from(T('profiles')).update({ name: g('name'), language: g('language') }).eq('id', S.me.id); if (r.error) throw r.error;
@@ -696,61 +730,67 @@
       case 'goto': S.tab = v; render(); return window.scrollTo(0, 0);
       case 'sec': S.sec[id] = !(S.sec[id] !== false); return render();
       case 'who': S.open['ev:' + id] = !S.open['ev:' + id]; return render();
-      case 'shop-list': S.shopList = v; return render();
-      case 'shop-newlist': {
-        var nl = await askForm(L('shopNewList'), [{ name: 'name', label: L('shopListName') }]);
-        if (!nl || !nl.name) return;
+      case 'shop-view': S.shopView = v; return render();
+      case 'need-done':
+        return act(async function () { var r = await sb.from(T('needs')).update({ active: false }).eq('id', id); if (r.error) throw r.error; });
+      case 'need-react':
+        return act(async function () { var r = await sb.from(T('needs')).update({ active: true }).eq('id', id); if (r.error) throw r.error; }, L('shReactivated'));
+      case 'need-unlist':
+        return act(async function () { var r = await sb.from(T('needs')).update({ list_id: null }).eq('id', id); if (r.error) throw r.error; });
+      case 'need-del':
+        return act(async function () { var r = await sb.from(T('needs')).delete().eq('id', id); if (r.error) throw r.error; });
+      case 'need-edit': {
+        var ne = S.needs.filter(function (x) { return x.id === id; })[0]; if (!ne) return;
+        var nf = await needEditForm(ne);
+        if (!nf || !nf.name) return;
         return act(async function () {
-          var r = await sb.from(T('shopping_lists')).insert({ name: nl.name, created_by: S.me.id }).select().single();
-          if (r.error) throw r.error;
-          S.shopList = r.data.id;
-        });
-      }
-      case 'shop-rename': {
-        var rl = S.lists.filter(function (x) { return x.id === id; })[0]; if (!rl) return;
-        var rn = await askForm(L('shopRename'), [{ name: 'name', label: L('shopListName'), value: rl.name }]);
-        if (!rn || !rn.name) return;
-        return act(async function () { var r = await sb.from(T('shopping_lists')).update({ name: rn.name }).eq('id', id); if (r.error) throw r.error; }, L('saved'));
-      }
-      case 'shop-dellist': {
-        var dl = S.lists.filter(function (x) { return x.id === id; })[0];
-        if (dl && await askConfirm(L('del'), L('shopDeleteListAsk', { name: dl.name }), true))
-          return act(async function () { var r = await sb.from(T('shopping_lists')).delete().eq('id', id); if (r.error) throw r.error; S.shopList = null; }, L('removed'));
-        return;
-      }
-      case 'shop-pick': return shopAddItem(v);
-      case 'shop-done': {
-        var si = S.items.filter(function (x) { return x.id === id; })[0]; if (!si) return;
-        return act(async function () {
-          var r = await sb.from(T('shopping_items')).update({ done: !si.done, done_at: !si.done ? new Date().toISOString() : null }).eq('id', id);
-          if (r.error) throw r.error;
-        });
-      }
-      case 'shop-edit': {
-        var ei = S.items.filter(function (x) { return x.id === id; })[0]; if (!ei) return;
-        var ef = await askForm(L('shopEditItem'), [
-          { name: 'name', label: L('shopItem'), value: ei.name },
-          { name: 'note', label: L('shopNote'), value: ei.note },
-          { name: 'list_id', label: L('shopList'), type: 'select', value: ei.list_id, options: S.lists.map(function (l) { return { v: l.id, l: l.name }; }) }
-        ]);
-        if (!ef || !ef.name) return;
-        return act(async function () {
-          var r = await sb.from(T('shopping_items')).update({ name: ef.name, note: ef.note || null, list_id: ef.list_id }).eq('id', id);
+          var r = await sb.from(T('needs')).update({ name: nf.name, note: nf.note || null, list_id: nf.list_id || null }).eq('id', id);
           if (r.error) throw r.error;
         }, L('saved'));
       }
-      case 'shop-del':
-        return act(async function () { var r = await sb.from(T('shopping_items')).delete().eq('id', id); if (r.error) throw r.error; });
-      case 'shop-clear': {
-        var cl = curList(); if (!cl) return;
-        return act(async function () { var r = await sb.from(T('shopping_items')).delete().eq('list_id', cl.id).eq('done', true); if (r.error) throw r.error; }, L('shopCleared'));
+      case 'need-assign': {
+        if (!S.lists.length) return toast(L('shNoLists'));
+        var af = await askForm(L('shAssignTitle'), [{ name: 'list_id', label: L('shList'), type: 'select', value: S.lists[0].id, options: listOptions(false) }]);
+        if (!af || !af.list_id) return;
+        return act(async function () { var r = await sb.from(T('needs')).update({ list_id: af.list_id }).eq('id', id); if (r.error) throw r.error; }, L('saved'));
       }
-      case 'shop-search': {
-        var inp = document.querySelector('form[data-form="shopadd"] input[name="item"]');
-        var q = inp ? inp.value.trim() : '';
-        if (!q) return toast(L('shopSearchEmpty'));
-        var pv = PROVIDERS.filter(function (p) { return p.id === v; })[0];
-        if (pv) window.open(pv.url(encodeURIComponent(q), lang), '_blank', 'noopener');
+      case 'list-new': {
+        var lf = await askForm(L('shNewList'), [
+          { name: 'name', label: L('shListName') },
+          { name: 'is_private', label: L('shPrivate'), type: 'checkbox', value: false }
+        ]);
+        if (!lf || !lf.name) return;
+        return act(async function () {
+          var r = await sb.from(T('shop_lists')).insert({ name: lf.name, owner_id: S.me.id, is_private: !!lf.is_private });
+          if (r.error) throw r.error;
+        }, L('saved'));
+      }
+      case 'list-rename': {
+        var rl = listById(id); if (!rl) return;
+        var rn = await askForm(L('shRename'), [{ name: 'name', label: L('shListName'), value: rl.name }]);
+        if (!rn || !rn.name) return;
+        return act(async function () { var r = await sb.from(T('shop_lists')).update({ name: rn.name }).eq('id', id); if (r.error) throw r.error; }, L('saved'));
+      }
+      case 'list-priv': {
+        var pl = listById(id); if (!pl) return;
+        return act(async function () { var r = await sb.from(T('shop_lists')).update({ is_private: !pl.is_private }).eq('id', id); if (r.error) throw r.error; }, L('saved'));
+      }
+      case 'list-del': {
+        var dl = listById(id);
+        if (dl && await askConfirm(L('del'), L('shDeleteListAsk', { name: dl.name }), true))
+          return act(async function () { var r = await sb.from(T('shop_lists')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
+        return;
+      }
+      case 'rec-new': return recurForm(null);
+      case 'rec-edit': return recurForm(S.rules.filter(function (x) { return x.id === id; })[0]);
+      case 'rec-toggle': {
+        var rr = S.rules.filter(function (x) { return x.id === id; })[0]; if (!rr) return;
+        return act(async function () { var r = await sb.from(T('recurring_tasks')).update({ active: !rr.active }).eq('id', id); if (r.error) throw r.error; });
+      }
+      case 'rec-del': {
+        var rd2 = S.rules.filter(function (x) { return x.id === id; })[0];
+        if (rd2 && await askConfirm(L('del'), L('recDeleteAsk', { title: rd2.title }), true))
+          return act(async function () { var r = await sb.from(T('recurring_tasks')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
         return;
       }
       case 'task-new': return taskForm(null);

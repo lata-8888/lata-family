@@ -196,3 +196,12 @@ p{margin:0}
 
 /* lange Tab-Namen (z. B. Family-Events) kürzen statt umbrechen */
 .tab span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Einkauf: Umschalter, private Listen */
+.shopseg{margin:0 0 14px}
+.acc.privlist{border-style:dashed;border-color:var(--crown)}
+.acc.privlist .acch{background:color-mix(in srgb,var(--crown) 18%,var(--surface))}
+.lock{display:inline-flex;width:18px;height:18px;vertical-align:-3px;margin-right:6px}
+.lock svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.privtag{font-family:var(--font);font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--crown);color:#fff;margin-left:8px;vertical-align:2px}
+.shopmng{margin:10px 0 2px}
