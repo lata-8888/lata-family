@@ -303,6 +303,7 @@
       if (S.me.language && LANGS.indexOf(S.me.language) > -1) setLang(S.me.language);
       if (S.me.theme) setTheme(S.me.theme);
       S.tab = 'events'; S.step = 'app'; S.err = ''; subscribe(); render(); window.scrollTo(0, 0);
+      extendSeries().then(function () { render(); }, function (e2) { console.error(e2); });
     } catch (e) { console.error(e); S.step = 'login'; S.err = errText(e); try { await sb.auth.signOut(); } catch (e2) { /* ignorieren */ } render(); }
   }
   async function logout() {
@@ -346,7 +347,7 @@
     var btn = function (v, cls, label) { return '<button type="button" class="resp ' + cls + '" data-act="answer" data-id="' + e.id + '" data-val="' + v + '" aria-pressed="' + !!(mine && mine.answer === v) + '">' + esc(label) + '</button>'; };
     return '<article class="ccel"><div class="cceh"><b>' + esc(fmtDay(e.starts_at)) + ' – ' + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
       (canManageEvents() ? '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.dots + '</button>' : '') + '</div>' +
-      '<div class="ccbody"><p class="muted small">' + esc(fmtTime(e.starts_at)) + (e.place ? ' · ' + esc(e.place) : '') + '</p>' +
+      '<div class="ccbody"><p class="muted small">' + esc(e.time_set === false ? L('evNoTime') : fmtTime(e.starts_at)) + (e.place ? ' · ' + esc(e.place) : '') + '</p>' +
       // Antwort-Knöpfe nur, wenn für das Event eine Teilnahme nötig ist (rsvp)
       (e.rsvp === false ? '' :
         '<div class="actrow">' + btn('yes', 'yes', L('evYes')) + btn('no', 'no', L('evNo')) +
@@ -378,8 +379,9 @@
   function viewEvents() {
     var limit = Date.now() - 3 * 3600e3;
     var yc = new Date(); yc.setFullYear(yc.getFullYear() + 1); var yearCut = yc.getTime();   // Agenda zeigt höchstens ein Jahr voraus
-    var up = S.events.filter(function (e) { var t = new Date(e.starts_at).getTime(); return t >= limit && t < yearCut; });
-    var past = S.events.filter(function (e) { return new Date(e.starts_at).getTime() < limit; }).reverse();
+    var up = S.events.filter(function (e) { var t = new Date(e.starts_at).getTime(); if (e.time_set === false) t += 86400000;   // ohne Uhrzeit: bis Tagesende aktuell
+      return t >= limit && t < yearCut; });
+    var past = S.events.filter(function (e) { return new Date(e.starts_at).getTime() + (e.time_set === false ? 86400000 : 0) < limit; }).reverse();
     var hz = evHorizon(), cut = null;
     if (hz > 0) { var c = new Date(); c.setMonth(c.getMonth() + hz); cut = c.getTime(); }
     var near = cut === null ? up : up.filter(function (e) { return new Date(e.starts_at).getTime() < cut; });
@@ -510,16 +512,13 @@
     if (!S.lists.length) html += '<div class="empty"><p>' + esc(L('shNoLists')) + '</p></div>';
     S.lists.forEach(function (l) {
       var items = active.filter(function (n) { return n.list_id === l.id; });
-      var mgmt = l.owner_id === S.me.id
-        ? '<div class="btnrow shopmng"><button type="button" class="mini" data-act="list-rename" data-id="' + l.id + '">' + esc(L('shRename')) + '</button>' +
-          '<button type="button" class="mini" data-act="list-priv" data-id="' + l.id + '">' + esc(l.is_private ? L('shMakeShared') : L('shMakePrivate')) + '</button>' +
-          '<button type="button" class="mini del" data-act="list-del" data-id="' + l.id + '">' + esc(L('del')) + '</button></div>' : '';
+      var dots = l.owner_id === S.me.id ? '<button type="button" class="hico" data-act="list-menu" data-id="' + l.id + '" aria-label="' + esc(L('shManage')) + '" title="' + esc(L('shManage')) + '">' + ICON.dots + '</button>' : '';
       var open = S.sec['lst-' + l.id] !== false;
       html += '<section class="acc' + (l.is_private ? ' privlist' : '') + '"><div class="acch">' +
         '<button type="button" class="acct" data-act="sec" data-id="lst-' + l.id + '" aria-expanded="' + open + '">' + lockIcon(l) + esc(l.name) + ' <span class="cnt">(' + items.length + ')</span>' +
         (l.is_private ? '<span class="privtag">' + esc(L('shPrivTag')) + '</span>' : '') + '</button>' +
-        '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
-        (open ? '<div class="accbody">' + ulOf(items.map(function (n) { return needRow(n, 'list'); }), 'shEmpty') + mgmt + '</div>' : '') + '</section>';
+        dots + '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
+        (open ? '<div class="accbody">' + ulOf(items.map(function (n) { return needRow(n, 'list'); }), 'shEmpty') + '</div>' : '') + '</section>';
     });
     return html;
   }
@@ -684,6 +683,16 @@
     wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('button')) wrap.remove(); });
   }
 
+  // «…»-Menü einer Liste: Umbenennen, privat/gemeinsam, Löschen (data-act wird vom globalen Klick-Handler ausgeführt)
+  function listMenu(l) {
+    var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
+    var b = function (act, label, cls) { return '<button type="button" class="btn ' + cls + '" data-act="' + act + '" data-id="' + esc(l.id) + '">' + esc(label) + '</button>'; };
+    wrap.innerHTML = '<div class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(l.name) + '"><h3>' + esc(l.name) + '</h3><div class="menu">' +
+      b('list-rename', L('shRename'), 'ghost') + b('list-priv', l.is_private ? L('shMakeShared') : L('shMakePrivate'), 'ghost') + b('list-del', L('del'), 'danger') +
+      '<button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button></div></div>';
+    document.body.appendChild(wrap);
+    wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('button')) wrap.remove(); });
+  }
   function render() {
     var app = document.getElementById('app'), nav = document.getElementById('nav');
     if (!configured) { app.innerHTML = '<main class="authwrap"><div class="authcard"><h1>' + esc(L('setupTitle')) + '</h1><p>' + esc(L('notConfigured')) + '</p></div></main>'; nav.hidden = true; return; }
@@ -734,7 +743,25 @@
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvt = e; if (S.step === 'app') render(); });
 
   // Wiederholung wie in Outlook: «Wiederholen alle [n] [Tag|Woche|Monat|Jahr]», Wochentage, «Bis»
-  function oneYear() { var d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function oneYear() { var d = new Date(); d.setFullYear(d.getFullYear() + 1); return isoDate(d); }
+  // unbegrenzte Serien laufend bis ein Jahr voraus ergänzen (nur Admin/Event Manager, beim Öffnen)
+  async function extendSeries() {
+    if (!canManageEvents()) return;
+    var bySid = {};
+    S.events.forEach(function (e) { if (e.series_id && e.series_open && e.series_rule) (bySid[e.series_id] = bySid[e.series_id] || []).push(e); });
+    var rows = [];
+    Object.keys(bySid).forEach(function (sid) {
+      var list = bySid[sid], r = list[0].series_rule;
+      var last = Math.max.apply(null, list.map(function (e) { return new Date(e.starts_at).getTime(); }));
+      genOccurrences(r.start, r.time, r.every, r.unit, r.wd, oneYear()).forEach(function (iso) {
+        if (new Date(iso).getTime() > last) rows.push({ title: list[0].title, place: list[0].place, rsvp: list[0].rsvp, time_set: list[0].time_set, starts_at: iso, series_id: sid, series_open: true, series_rule: r });
+      });
+    });
+    if (!rows.length) return;
+    var res = await sb.from(T('events')).insert(rows);
+    if (res.error) console.error(res.error); else await loadAll();
+  }
   function recurrenceBlock() {
     var days = [1, 2, 3, 4, 5, 6, 7].map(function (n) {
       var nm = new Date(2024, 0, n).toLocaleDateString(LOCALE[lang], { weekday: 'short' });   // 1.1.2024 war ein Montag
@@ -751,7 +778,7 @@
   }
   // erzeugt die Startzeitpunkte einer Serie (lokale Zeit, höchstens 150)
   function genOccurrences(date, time, every, unit, wd, until) {
-    var out = [], max = 150, p = date.split('-').map(Number), tp = time.split(':').map(Number);
+    var out = [], max = 400, p = date.split('-').map(Number), tp = time.split(':').map(Number);
     var start = new Date(p[0], p[1] - 1, p[2]), end = new Date(until + 'T23:59:59');
     var add = function (d) { out.push(new Date(d.getFullYear(), d.getMonth(), d.getDate(), tp[0], tp[1]).toISOString()); };
     var k, d;
@@ -798,6 +825,7 @@
       scope = sf.scope;
     } else if (!(await askConfirm(L('del'), L('evDeleteAsk', { name: ev.title }), true))) return;
     return act(async function () {
+      if (scope === 'future' && ev.series_open) { var u = await sb.from(T('events')).update({ series_open: false }).eq('series_id', ev.series_id); if (u.error) throw u.error; }
       var q = sb.from(T('events')).delete();
       q = scope === 'one' ? q.eq('id', ev.id) : scope === 'future' ? q.eq('series_id', ev.series_id).gte('starts_at', ev.starts_at) : q.eq('series_id', ev.series_id);
       var r = await q; if (r.error) throw r.error;
@@ -805,7 +833,7 @@
   }
   async function eventForm(ev) {
     // Wie in der FBRO-App: Titel, Datum und Uhrzeit getrennt (Datum | Zeit nebeneinander), Ort
-    var local = ev ? toLocalInput(ev.starts_at).split('T') : ['', '18:00'];
+    var local = ev ? toLocalInput(ev.starts_at).split('T') : ['', ''];
     var fields = [
       { name: 'title', label: L('evTitle'), value: ev && ev.title },
       { name: 'date', label: L('evDate'), type: 'date', value: local[0], half: true },
@@ -818,17 +846,18 @@
     var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null);
     if (!f) return;
     if (f.__extra) return deleteEvent(ev);
-    if (!f.title || !f.date || !f.time || !f.place) return toast(L('evMissing'));
-    var row = { title: f.title, place: f.place, starts_at: new Date(f.date + 'T' + f.time).toISOString(), rsvp: !!f.rsvp };
+    if (!f.title || !f.date) return toast(L('evMissing'));
+    var hasTime = !!f.time, tm = f.time || '00:00';
+    var row = { title: f.title, place: f.place || null, starts_at: new Date(f.date + 'T' + tm).toISOString(), rsvp: !!f.rsvp, time_set: hasTime };
     if (!ev && f.repeat) {
-      if (!f.until) return toast(L('evUntilMissing'));
       var maxD = new Date(); maxD.setFullYear(maxD.getFullYear() + 1);
-      var maxIso = maxD.getFullYear() + '-' + String(maxD.getMonth() + 1).padStart(2, '0') + '-' + String(maxD.getDate()).padStart(2, '0');
-      if (f.until > maxIso) f.until = maxIso;
-      var occ = genOccurrences(f.date, f.time, Math.max(1, f.every || 1), f.unit, f.wd, f.until);
+      var maxIso = isoDate(maxD), open = !f.until;
+      if (open || f.until > maxIso) f.until = maxIso;
+      var rule = { start: f.date, time: tm, every: Math.max(1, f.every || 1), unit: f.unit, wd: f.wd || [] };
+      var occ = genOccurrences(rule.start, rule.time, rule.every, rule.unit, rule.wd, f.until);
       if (!occ.length) return toast(L('evNoOcc'));
       var sid = newSeriesId();
-      var rows = occ.map(function (iso) { return { title: row.title, place: row.place, rsvp: row.rsvp, starts_at: iso, series_id: sid }; });
+      var rows = occ.map(function (iso) { return { title: row.title, place: row.place, rsvp: row.rsvp, time_set: hasTime, starts_at: iso, series_id: sid, series_open: open, series_rule: open ? rule : null }; });
       return act(async function () { var r = await sb.from(T('events')).insert(rows); if (r.error) throw r.error; }, L('evSeriesAdded', { n: rows.length }));
     }
     return act(async function () {
@@ -875,6 +904,7 @@
       case 'sec': S.sec[id] = !(S.sec[id] !== false); return render();
       case 'who': S.open['ev:' + id] = !S.open['ev:' + id]; return render();
       case 'shop-view': S.shopView = v; return render();
+      case 'list-menu': { var lm = listById(id); if (lm) listMenu(lm); return; }
       case 'task-view': S.taskView = v; return render();
       case 'need-done':
         return act(async function () { var r = await sb.from(T('needs')).update({ active: false }).eq('id', id); if (r.error) throw r.error; });
