@@ -455,10 +455,11 @@
   function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
   function viewShop() {
     var needView = S.shopView !== 'lists';
-    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1><p>' + esc(L('shopSub')) + '</p></div>' +
+    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1></div>' +
       (needView ? '' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shNewList')) + '" title="' + esc(L('shNewList')) + '">' + ICON.plus + '</button>') + '</div>';
-    var seg = function (v, label) { return '<button type="button" class="segbtn' + ((v === 'need') === needView ? ' on' : '') + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
-    html += '<div class="segctl shopseg">' + seg('need', L('shNeed')) + seg('lists', L('shLists')) + '</div>';
+    // zwei Register (Tabs) statt Knöpfe
+    var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
+    html += '<div class="subtabs" role="tablist">' + tab('need', L('shNeed')) + tab('lists', L('shLists')) + '</div>';
     return html + (needView ? viewNeeds() : viewLists());
   }
   function viewNeeds() {

@@ -212,3 +212,8 @@ p{margin:0}
 .morebtn[aria-expanded="true"] svg{transform:rotate(180deg)}
 .top .addbtn + .addbtn{margin-left:8px}
 .top{align-items:flex-end}
+/* Register (Tabs) innerhalb einer Seite, z. B. Einkauf */
+.subtabs{display:flex;border-bottom:1px solid var(--line);margin:0 0 16px}
+.subtab{flex:1;min-width:0;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:12px 6px;font-family:var(--font-head);font-weight:700;font-size:1.2rem;color:var(--muted);text-transform:var(--head-tt);cursor:pointer}
+.subtab.on{color:var(--crown);border-bottom-color:var(--crown)}
+.subtab:focus-visible{outline-offset:-3px;border-radius:6px}
