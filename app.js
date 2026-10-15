@@ -129,7 +129,7 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], needs: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-hist': false }, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], needs: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-others': false }, open: {}, phone: '' };
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
   var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
@@ -527,17 +527,19 @@
     return parts.join(' · ');
   }
   // Zeile eines Produkts; mode: need (aktiv, meine) | hist (Historie) | list (in einer Liste) | none (noch in keiner Liste)
+  // Wunschliste einer Person = Produkte, die ihr zugeteilt sind (eigene Produkte ohne jede Zuteilung zählen für die Besitzerin/den Besitzer mit)
+  function needUsers(n) { return S.needAssign.filter(function (x) { return x.need_id === n.id; }).map(function (x) { return x.user_id; }); }
+  function onMyWishlist(n) { var u = needUsers(n); return u.indexOf(S.me.id) > -1 || (n.owner_id === S.me.id && !u.length); }
   function needActions(n, mode) {
-    var mine = n.owner_id === S.me.id, a = [];
-    if (mode === 'hist') a.push(['need-react', L('shReactivate'), 'ghost']);
+    var mine = n.owner_id === S.me.id, a = [], onMine = onMyWishlist(n);
     if (mode === 'none') a.push(['need-assign', L('shAssign'), 'ghost']);
-    if (mine && (mode === 'need' || mode === 'none' || mode === 'list')) a.push(['need-edit', L('edit'), 'ghost']);
+    if (mine && mode !== 'others') a.push(['need-edit', L('edit'), 'ghost']);
     if (mode === 'list' || mode === 'none') a.push(['need-sel', L('shUnselect'), 'ghost', '0']);
-    if (mine && mode === 'need') a.push(['need-done', L('shBought'), 'ghost']);
-    if (mine && (mode === 'need' || mode === 'hist')) a.push(['need-del', L('del'), 'danger']);
+    // Produkte mutieren: auf meine Wunschliste setzen oder davon entfernen
+    a.push(onMine ? ['need-unwish', L('shWishRemove'), 'ghost'] : ['need-wish', L('shWishAdd'), 'ghost']);
+    if (mine && (mode === 'need' || mode === 'assigned')) a.push(['need-del', L('del'), 'danger']);
     return a;
-  }
-  // Wunschliste (need/assigned): Kästchen = «auf die Einkaufsliste» (selected). Einkaufsliste (list/none): Kästchen = abgehakt (checked), gedimmt unten.
+  }  // Wunschliste (need/assigned): Kästchen = «auf die Einkaufsliste» (selected). Einkaufsliste (list/none): Kästchen = abgehakt (checked), gedimmt unten.
   // Rechts jeweils «…» und Kästchen.
   function needRow(n, mode) {
     var wish = mode === 'need' || mode === 'assigned', shop = mode === 'list' || mode === 'none';
@@ -548,7 +550,7 @@
     var menu = needActions(n, mode).length
       ? '<button type="button" class="hico" data-act="need-menu" data-id="' + n.id + '" data-val="' + mode + '" aria-label="' + esc(L('actions')) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button>' : '';
     return '<li class="trow shopi' + (mode === 'hist' ? ' tdone' : '') + (shop && n.checked ? ' chk' : '') + '">' +
-      '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none' || mode === 'assigned', mode === 'need' || mode === 'hist') + '</span></div>' +
+      '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none' || mode === 'assigned' || mode === 'others', mode === 'need' || mode === 'hist') + '</span></div>' +
       (menu ? '<div class="btnrow">' + menu + '</div>' : '') + check + '</li>';
   }  // «…»-Menü eines Produkts (data-act wird vom globalen Klick-Handler ausgeführt)
   function needMenu(n, mode) {
@@ -571,14 +573,14 @@
   function viewNeeds() {
     var uid = S.me.id;
     var byName = function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); };
-    var toMe = S.needAssign.filter(function (x) { return x.user_id === uid; }).map(function (x) { return x.need_id; });
-    // eigene aktive Produkte und aktive Produkte, die mir zugeteilt sind; das Kästchen wählt sie für die Einkaufsliste
-    var all = S.needs.filter(function (n) { return n.active && (n.owner_id === uid || toMe.indexOf(n.id) > -1); }).sort(byName);
-    var rowOf = function (n) { return needRow(n, n.owner_id === uid ? 'need' : 'assigned'); };
-    var hist = S.needs.filter(function (n) { return n.owner_id === uid && !n.active; }).sort(function (a, b) { return String(b.done_at || '').localeCompare(String(a.done_at || '')); });
+    var active = S.needs.filter(function (n) { return n.active; });
+    // meine Wunschliste; das Kästchen wählt ein Produkt für die Einkaufsliste
+    var mineL = active.filter(onMyWishlist).sort(byName);
+    // was andere wünschen: nur anderen Personen zugeteilt
+    var others = active.filter(function (n) { return !onMyWishlist(n) && needUsers(n).length; }).sort(byName);
     var html = '';
-    html += accordion('need-open', L('shNeeded'), all.length, ulOf(all.map(rowOf), 'shEmpty'));
-    html += accordion('need-hist', L('shHistory'), hist.length, ulOf(hist.map(function (n) { return needRow(n, 'hist'); }), 'shHistoryEmpty'));
+    html += accordion('need-open', L('shNeeded'), mineL.length, ulOf(mineL.map(function (n) { return needRow(n, n.owner_id === uid ? 'need' : 'assigned'); }), 'shEmpty'));
+    html += accordion('need-others', L('shOthers'), others.length, ulOf(others.map(function (n) { return needRow(n, 'others'); }), 'shOthersEmpty'));
     return html;
   }  function viewLists() {
     var active = S.needs.filter(function (n) { return n.active && n.selected; });   // nur auf der Wunschliste gewählte Produkte
@@ -638,7 +640,7 @@
       { name: 'name', label: L('shName'), value: n.name },
       { name: 'note', label: L('shNote'), value: n.note },
       { name: 'list_id', label: L('shList'), type: 'select', value: n.list_id || '', options: listOptions(true) },
-      { name: 'users', label: L('evAssignTo'), type: 'multi', value: S.needAssign.filter(function (x) { return x.need_id === n.id; }).map(function (x) { return x.user_id; }), options: memberOptions() }
+      { name: 'users', label: L('evAssignTo'), type: 'multi', value: needUsers(n).length ? needUsers(n) : (n.owner_id === S.me.id ? [S.me.id] : []), options: memberOptions() }
     ]);
   }
 
@@ -1056,7 +1058,7 @@
           { name: 'name', label: L('shName'), list: hist },
           { name: 'note', label: L('shNote') },
           { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true) },
-          { name: 'users', label: L('evAssignTo'), type: 'multi', value: [], options: memberOptions() }
+          { name: 'users', label: L('evAssignTo'), type: 'multi', value: [S.me.id], options: memberOptions() }
         ]);
         if (!nf) return;
         return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users });
@@ -1076,6 +1078,16 @@
         return act(async function () { var r = await sb.from(T('needs')).update({ checked: v === '1' }).eq('id', id); if (r.error) throw r.error; });
       case 'list-clear':
         return act(async function () { var r = await sb.from(T('needs')).update({ selected: false, checked: false }).eq('list_id', id).eq('active', true).eq('checked', true); if (r.error) throw r.error; });
+      case 'need-wish':
+        return act(async function () { var r = await sb.from(T('need_assignees')).upsert({ need_id: id, user_id: S.me.id }, { onConflict: 'need_id,user_id', ignoreDuplicates: true }); if (r.error) throw r.error; }, L('saved'));
+      case 'need-unwish':
+        return act(async function () {
+          var others = S.needAssign.filter(function (x) { return x.need_id === id && x.user_id !== S.me.id; });
+          var r = others.length
+            ? await sb.from(T('need_assignees')).delete().eq('need_id', id).eq('user_id', S.me.id)
+            : await sb.from(T('needs')).update({ active: false, checked: false, selected: false }).eq('id', id);   // niemand sonst wünscht es: Produkt wird archiviert
+          if (r.error) throw r.error;
+        }, L('saved'));
       case 'need-sel':
         return act(async function () { var r = await sb.from(T('needs')).update({ selected: v === '1', checked: false }).eq('id', id); if (r.error) throw r.error; });
       case 'need-done':
