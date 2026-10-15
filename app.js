@@ -50,9 +50,11 @@
   var DESIGNS = [
     { id: 'standard', colors: ['#307CC0', '#E3EFF9', '#F3F4F0'] },
     { id: 'holland', colors: ['#EA580C', '#F97316', '#FFF7ED'] },
-    { id: 'light', colors: ['#111827', '#E5E7EB', '#FFFFFF'] }
+    { id: 'light', colors: ['#111827', '#E5E7EB', '#FFFFFF'] },
+    { id: 'petrol', colors: ['#0E5F6F', '#2BAFC4', '#EAF4F6'] }
   ];
-  var design = 'standard';
+  var design = 'standard';        // wirksames Design (eigene Wahl, sonst Standard des Admins)
+  var adminDesign = 'standard';   // Standard-Design der App (vom Admin)
   function applyDesign(d) {
     if (!DESIGNS.some(function (x) { return x.id === d; })) d = 'standard';
     design = d; document.documentElement.setAttribute('data-design', d);
@@ -159,7 +161,7 @@
           else if (f.type === 'select') html = '<label class="fld"><span>' + esc(f.label) + '</span><select name="' + f.name + '">' + f.options.map(function (o) {
             return '<option value="' + esc(o.v) + '"' + (o.v === f.value ? ' selected' : '') + '>' + esc(o.l) + '</option>';
           }).join('') + '</select></label>';
-          else html = '<label class="fld"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off"></label>';
+          else html = '<label class="fld"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off"' + (f.list ? ' list="dl_' + f.name + '"' : '') + '>' + (f.list ? '<datalist id="dl_' + f.name + '">' + f.list.map(function (x) { return '<option value="' + esc(x) + '"></option>'; }).join('') + '</datalist>' : '') + '</label>';
           // aufeinanderfolgende Felder mit half:true stehen nebeneinander (z. B. Datum | Zeit)
           var prev = fields[i - 1], next = fields[i + 1];
           if (f.half && !(prev && prev.half)) html = '<div class="grid2">' + html;
@@ -260,10 +262,12 @@
     ]);
     r.forEach(function (x) { if (x.error) throw x.error; });
     S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.needs = r[7].data; S.rules = r[8].data;
-    applyDesign(r[3].data);
+    adminDesign = DESIGNS.some(function (x) { return x.id === r[3].data; }) ? r[3].data : 'standard';
     S.defaultLang = LANGS.indexOf(r[4].data) > -1 ? r[4].data : 'de';
     try { localStorage.setItem('app-default-lang' + SFX, S.defaultLang); } catch (e) { /* ignorieren */ }
     S.me = S.members.filter(function (m) { return m.id === uid; })[0] || null;
+    // jede Person kann ihr Design selbst wählen; ohne eigene Wahl gilt das Standard-Design des Admins
+    applyDesign(S.me && DESIGNS.some(function (x) { return x.id === S.me.design; }) ? S.me.design : adminDesign);
     // Sprache: eigene Wahl im Profil, sonst die Standardsprache der App
     if (S.me) setLang(LANGS.indexOf(S.me.language) > -1 ? S.me.language : S.defaultLang);
   }
@@ -487,7 +491,7 @@
   function viewShop() {
     var needView = S.shopView !== 'lists';
     var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1></div>' +
-      (needView ? '' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shNewList')) + '" title="' + esc(L('shNewList')) + '">' + ICON.plus + '</button>') + '</div>';
+      '<button type="button" class="hico addbtn" data-act="' + (needView ? 'need-new' : 'list-new') + '" aria-label="' + esc(needView ? L('shAdd') : L('shNewList')) + '" title="' + esc(needView ? L('shAdd') : L('shNewList')) + '">' + ICON.plus + '</button>' + '</div>';
     // zwei Register (Tabs) statt Knöpfe
     var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
     html += '<div class="subtabs" role="tablist">' + tab('need', L('shNeed')) + tab('lists', L('shLists')) + '</div>';
@@ -498,9 +502,7 @@
     var byName = function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); };
     var open = mine.filter(function (n) { return n.active; }).sort(byName);
     var hist = mine.filter(function (n) { return !n.active; }).sort(function (a, b) { return String(b.done_at || '').localeCompare(String(a.done_at || '')); });
-    var html = '<form class="addbar" data-form="needadd"><input name="item" list="needhist" maxlength="80" autocomplete="off" placeholder="' + esc(L('shAddPh')) + '" aria-label="' + esc(L('shName')) + '">' +
-      '<datalist id="needhist">' + hist.map(function (n) { return '<option value="' + esc(n.name) + '"></option>'; }).join('') + '</datalist>' +
-      '<button class="btn inline" type="submit">' + esc(L('shAdd')) + '</button></form>';
+    var html = '';
     html += accordion('need-open', L('shNeeded'), open.length, ulOf(open.map(function (n) { return needRow(n, 'need'); }), 'shEmpty'));
     html += accordion('need-hist', L('shHistory'), hist.length, ulOf(hist.map(function (n) { return needRow(n, 'hist'); }), 'shHistoryEmpty'));
     return html;
@@ -523,7 +525,8 @@
     return html;
   }
   // Produkt hinzufügen: ein früheres Produkt gleichen Namens wird reaktiviert statt doppelt angelegt
-  async function needAdd(name) {
+  async function needAdd(name, extra) {
+    extra = extra || {};
     name = String(name || '').trim();
     if (!name) return toast(L('shMissing'));
     var low = name.toLowerCase();
@@ -531,8 +534,8 @@
     if (same.some(function (n) { return n.active; })) return toast(L('shAlready'));
     var old = same.filter(function (n) { return !n.active; })[0];
     return act(async function () {
-      var r = old ? await sb.from(T('needs')).update({ active: true }).eq('id', old.id)
-        : await sb.from(T('needs')).insert({ name: name, owner_id: S.me.id });
+      var r = old ? await sb.from(T('needs')).update({ active: true, note: extra.note || old.note || null, list_id: extra.list_id || old.list_id || null }).eq('id', old.id)
+        : await sb.from(T('needs')).insert({ name: name, owner_id: S.me.id, note: extra.note || null, list_id: extra.list_id || null });
       if (r.error) throw r.error;
     }, old ? L('shReactivated') : null);
   }
@@ -558,6 +561,7 @@
       '<label class="fld"><span>' + esc(L('language')) + '</span><select name="language">' + LANGS.map(function (l) { return '<option value="' + l + '"' + (l === lang ? ' selected' : '') + '>' + LANG_NAMES[l] + '</option>'; }).join('') + '</select></label>' +
       '<button class="btn" type="submit">' + esc(L('save')) + '</button></form></section>' +
       '<section class="card"><h2>' + esc(L('theme')) + '</h2><div class="segctl">' + opt('light', L('themeLight')) + opt('dark', L('themeDark')) + opt('', L('themeAuto')) + '</div></section>' +
+      '<section class="card"><h2>' + esc(L('designTitle')) + '</h2><div class="segctl">' + DESIGNS.map(function (d) { return '<button type="button" class="segbtn' + (design === d.id ? ' on' : '') + '" data-act="set-design" data-val="' + d.id + '" aria-pressed="' + (design === d.id) + '">' + esc(L('design_' + d.id)) + '</button>'; }).join('') + '</div></section>' +
       '<section class="card"><h2>' + esc(L('pin')) + '</h2><form data-form="pin">' + fld(L('newPin'), 'pin', 'password', '', 'inputmode="numeric" maxlength="6"') +
       '<button class="btn" type="submit">' + esc(L('changePin')) + '</button></form></section>' +
       '<section class="card"><h2>' + esc(L('installTitle')) + '</h2>' + install + '</section>' +
@@ -639,13 +643,13 @@
     html += accordion('recur', L('recurTitle'), S.rules.length, recurBody(), 'rec-new', L('recurNew'));
     // Design der ganzen App (nur Admins)
     var dsg = DESIGNS.map(function (d) {
-      var on = d.id === design;
+      var on = d.id === adminDesign;
       return '<button type="button" class="dsgrow' + (on ? ' on' : '') + '" data-act="design" data-val="' + d.id + '" aria-pressed="' + on + '">' +
         '<span class="sw">' + d.colors.map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('') + '</span>' +
         '<span class="nm"><b>' + esc(L('design_' + d.id)) + '</b><span>' + esc(L('design_' + d.id + '_d')) + '</span></span>' +
         (on ? '<span class="ok">' + ICON.check + '</span>' : '') + '</button>';
     }).join('');
-    html += accordion('design', L('designTitle'), null, dsg);
+    html += accordion('design', L('designDefault'), null, dsg);
     // Standardsprache der App (nur Admins); Personen können sie im Profil überschreiben
     var lng = '<p class="muted small" style="margin-bottom:10px">' + esc(L('langHint')) + '</p>' + LANGS.map(function (l) {
       var on = l === S.defaultLang;
@@ -905,6 +909,16 @@
       case 'who': S.open['ev:' + id] = !S.open['ev:' + id]; return render();
       case 'shop-view': S.shopView = v; return render();
       case 'list-menu': { var lm = listById(id); if (lm) listMenu(lm); return; }
+      case 'need-new': {
+        var hist = S.needs.filter(function (n) { return n.owner_id === S.me.id && !n.active; }).map(function (n) { return n.name; });
+        var nf = await askForm(L('shAdd'), [
+          { name: 'name', label: L('shName'), list: hist },
+          { name: 'note', label: L('shNote') },
+          { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true) }
+        ]);
+        if (!nf) return;
+        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id });
+      }
       case 'task-view': S.taskView = v; return render();
       case 'need-done':
         return act(async function () { var r = await sb.from(T('needs')).update({ active: false }).eq('id', id); if (r.error) throw r.error; });
@@ -981,12 +995,17 @@
         return;
       }
       case 'applang': if (isAdmin() && v !== S.defaultLang) return rpc('set_app_language', { p_lang: v }, L('langSaved')); return;
-      case 'design': if (isAdmin() && v !== design) return rpc('set_app_design', { p_design: v }, L('designSaved')); return;
+      case 'design': if (isAdmin() && v !== adminDesign) return rpc('set_app_design', { p_design: v }, L('designSaved')); return;
       case 'em': return rpc('set_event_manager', { target: id, flag: v === 'true' }, L('saved'));
       case 'guest': return rpc('set_guest', { target: id, flag: v === 'true' }, L('saved'));
       case 'mb-menu': if (isAdmin() && member) memberMenu(member); return;
       case 'logout': return logout();
       case 'install': if (installEvt) { installEvt.prompt(); installEvt = null; render(); } return;
+      case 'set-design':
+        if (!DESIGNS.some(function (x) { return x.id === v; })) return;
+        S.me.design = v; applyDesign(v); render();
+        sb.from(T('profiles')).update({ design: v }).eq('id', S.me.id).then(function () {}, function (e2) { console.error(e2); });
+        return;
       case 'set-theme':
         setTheme(v); render();
         sb.from(T('profiles')).update({ theme: v || null }).eq('id', S.me.id).then(function () {}, function () {});
