@@ -133,6 +133,7 @@
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
   var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
+  S.needAssign = [];   // Zuteilung von Produkten an Personen: { need_id, user_id }
   S.assign = [];   // Zuteilung von Events an Personen: { event_id, user_id }
   var installEvt = null;
   var isAdmin = function () { return !!(S.me && S.me.is_admin); };
@@ -272,6 +273,8 @@
     r.forEach(function (x) { if (x.error) throw x.error; });
     var ra = await sb.from(T('event_assignees')).select('*'); if (ra.error) throw ra.error;
     S.assign = ra.data || [];
+    var rn = await sb.from(T('need_assignees')).select('*'); if (rn.error) throw rn.error;
+    S.needAssign = rn.data || [];
     S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.needs = r[7].data; S.rules = r[8].data;
     adminDesign = DESIGNS.some(function (x) { return x.id === r[3].data; }) ? r[3].data : 'standard';
     S.defaultLang = LANGS.indexOf(r[4].data) > -1 ? r[4].data : 'de';
@@ -517,6 +520,8 @@
   function needMeta(n, showOwner, showList) {
     var parts = [];
     if (n.note) parts.push(esc(n.note));
+    var asg = S.needAssign.filter(function (x) { return x.need_id === n.id && (n.owner_id === S.me.id || x.user_id !== S.me.id); }).map(function (x) { return nameOf(x.user_id); });
+    if (asg.length) parts.push(esc(L('shFor', { names: asg.join(', ') })));
     if (showList) { var l = listById(n.list_id); parts.push(l ? lockIcon(l) + esc(l.name) : esc(L('shNoList'))); }
     if (showOwner && n.owner_id !== S.me.id) parts.push(esc(L('shBy', { name: nameOf(n.owner_id) })));
     return parts.join(' · ');
@@ -527,6 +532,7 @@
     if (mode === 'hist') a.push(['need-react', L('shReactivate'), 'ghost']);
     if (mode === 'none') a.push(['need-assign', L('shAssign'), 'ghost']);
     if (mine && (mode === 'need' || mode === 'none')) a.push(['need-edit', L('edit'), 'ghost']);
+    if (mine && mode === 'need') a.push(['need-check', n.checked ? L('shUntick') : L('shTick'), 'ghost', n.checked ? '0' : '1']);
     if (mine && mode === 'need') a.push(['need-done', L('shBought'), 'ghost']);
     if (mine && (mode === 'need' || mode === 'hist')) a.push(['need-del', L('del'), 'danger']);
     return a;
@@ -534,18 +540,18 @@
   function needRow(n, mode) {
     var chk = !!n.checked;
     // Einkaufsliste: Name links, Kästchen rechts (abgehakt = gedimmt, kann wieder abgewählt werden); Wunschliste: Name links, «…» rechts
-    var check = mode === 'list'
+    var check = (mode === 'list' || mode === 'assigned')
       ? '<button type="button" role="checkbox" class="tchk' + (chk ? ' on' : '') + '" data-act="need-check" data-id="' + n.id + '" data-val="' + (chk ? '0' : '1') + '" aria-checked="' + chk + '" aria-label="' + esc(L('shBought')) + '" title="' + esc(L('shBought')) + '">' + ICON.check + '</button>' : '';
     var menu = needActions(n, mode).length
       ? '<button type="button" class="hico" data-act="need-menu" data-id="' + n.id + '" data-val="' + mode + '" aria-label="' + esc(L('actions')) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button>' : '';
-    return '<li class="trow shopi' + (mode === 'hist' ? ' tdone' : '') + (mode === 'list' && chk ? ' chk' : '') + '">' +
-      '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none', mode === 'need' || mode === 'hist') + '</span></div>' +
+    return '<li class="trow shopi' + (mode === 'hist' ? ' tdone' : '') + (mode !== 'hist' && mode !== 'none' && chk ? ' chk' : '') + '">' +
+      '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none' || mode === 'assigned', mode === 'need' || mode === 'hist') + '</span></div>' +
       (menu ? '<div class="btnrow">' + menu + '</div>' : '') + check + '</li>';
   }  // «…»-Menü eines Produkts (data-act wird vom globalen Klick-Handler ausgeführt)
   function needMenu(n, mode) {
     var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
     wrap.innerHTML = '<div class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(n.name) + '"><h3>' + esc(n.name) + '</h3><div class="menu">' +
-      needActions(n, mode).map(function (x) { return '<button type="button" class="btn ' + x[2] + '" data-act="' + x[0] + '" data-id="' + esc(n.id) + '">' + esc(x[1]) + '</button>'; }).join('') +
+      needActions(n, mode).map(function (x) { return '<button type="button" class="btn ' + x[2] + '" data-act="' + x[0] + '" data-id="' + esc(n.id) + '"' + (x[3] != null ? ' data-val="' + x[3] + '"' : '') + '>' + esc(x[1]) + '</button>'; }).join('') +
       '<button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button></div></div>';
     document.body.appendChild(wrap);
     wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('button')) wrap.remove(); });
@@ -560,16 +566,21 @@
     return html + (needView ? viewNeeds() : viewLists());
   }
   function viewNeeds() {
-    var mine = S.needs.filter(function (n) { return n.owner_id === S.me.id; });
+    var uid = S.me.id;
     var byName = function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); };
-    var open = mine.filter(function (n) { return n.active; }).sort(byName);
-    var hist = mine.filter(function (n) { return !n.active; }).sort(function (a, b) { return String(b.done_at || '').localeCompare(String(a.done_at || '')); });
+    var toMe = S.needAssign.filter(function (x) { return x.user_id === uid; }).map(function (x) { return x.need_id; });
+    // eigene aktive Produkte und aktive Produkte, die mir zugeteilt sind
+    var all = S.needs.filter(function (n) { return n.active && (n.owner_id === uid || toMe.indexOf(n.id) > -1); });
+    var open = all.filter(function (n) { return !n.checked; }).sort(byName), done = all.filter(function (n) { return n.checked; }).sort(byName);
+    var rowOf = function (n) { return needRow(n, n.owner_id === uid ? 'need' : 'assigned'); };
+    var hist = S.needs.filter(function (n) { return n.owner_id === uid && !n.active; }).sort(function (a, b) { return String(b.done_at || '').localeCompare(String(a.done_at || '')); });
+    var body = open.length || !done.length ? ulOf(open.map(rowOf), 'shEmpty') : '';
+    if (done.length) body += '<ul class="list">' + done.map(rowOf).join('') + '</ul>';
     var html = '';
-    html += accordion('need-open', L('shNeeded'), open.length, ulOf(open.map(function (n) { return needRow(n, 'need'); }), 'shEmpty'));
+    html += accordion('need-open', L('shNeeded'), open.length, body);
     html += accordion('need-hist', L('shHistory'), hist.length, ulOf(hist.map(function (n) { return needRow(n, 'hist'); }), 'shHistoryEmpty'));
     return html;
-  }
-  function viewLists() {
+  }  function viewLists() {
     var active = S.needs.filter(function (n) { return n.active; });
     var none = active.filter(function (n) { return !n.list_id; });
     var html = accordion('lst-none', L('shNoList'), none.length, ulOf(none.map(function (n) { return needRow(n, 'none'); }), 'shEmpty'));
@@ -577,16 +588,27 @@
     S.lists.forEach(function (l) {
       var items = active.filter(function (n) { return n.list_id === l.id; });
       var itemsOpen = items.filter(function (n) { return !n.checked; }), itemsDone = items.filter(function (n) { return n.checked; });
-      var dots = l.owner_id === S.me.id ? '<button type="button" class="hico" data-act="list-menu" data-id="' + l.id + '" aria-label="' + esc(L('shManage')) + '" title="' + esc(L('shManage')) + '">' + ICON.dots + '</button>' : '';
+      var dots = (l.owner_id === S.me.id || itemsDone.length) ? '<button type="button" class="hico" data-act="list-menu" data-id="' + l.id + '" aria-label="' + esc(L('shManage')) + '" title="' + esc(L('shManage')) + '">' + ICON.dots + '</button>' : '';
       var open = S.sec['lst-' + l.id] !== false;
       html += '<section class="acc' + (l.is_private ? ' privlist' : '') + '"><div class="acch">' +
         '<button type="button" class="acct" data-act="sec" data-id="lst-' + l.id + '" aria-expanded="' + open + '">' + lockIcon(l) + esc(l.name) + ' <span class="cnt">(' + itemsOpen.length + ')</span>' +
         (l.is_private ? '<span class="privtag">' + esc(L('shPrivTag')) + '</span>' : '') + '</button>' +
         dots + '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
         (open ? '<div class="accbody">' + (itemsOpen.length || !itemsDone.length ? ulOf(itemsOpen.map(function (n) { return needRow(n, 'list'); }), 'shEmpty') : '') +
-          (itemsDone.length ? '<ul class="list">' + itemsDone.map(function (n) { return needRow(n, 'list'); }).join('') + '</ul><div class="btnrow shopmng"><button type="button" class="mini" data-act="list-clear" data-id="' + l.id + '">' + esc(L('shClearChecked')) + '</button></div>' : '') + '</div>' : '') + '</section>';
+          (itemsDone.length ? '<ul class="list">' + itemsDone.map(function (n) { return needRow(n, 'list'); }).join('') + '</ul>' : '') + '</div>' : '') + '</section>';
     });
     return html;
+  }
+  // ersetzt die Zuteilung eines Produkts durch die gewählten Personen
+  async function setNeedAssignees(id, users) {
+    var d = await sb.from(T('need_assignees')).delete().eq('need_id', id); if (d.error) throw d.error;
+    if (users.length) {
+      var i = await sb.from(T('need_assignees')).insert(users.map(function (u) { return { need_id: id, user_id: u }; }));
+      if (i.error) throw i.error;
+    }
+  }
+  function memberOptions() {
+    return S.members.slice().sort(function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); }).map(function (m) { return { v: m.id, l: m.name + (m.id === S.me.id ? ' (' + L('you') + ')' : '') }; });
   }
   // Produkt hinzufügen: ein früheres Produkt gleichen Namens wird reaktiviert statt doppelt angelegt
   async function needAdd(name, extra) {
@@ -598,16 +620,25 @@
     if (same.some(function (n) { return n.active; })) return toast(L('shAlready'));
     var old = same.filter(function (n) { return !n.active; })[0];
     return act(async function () {
-      var r = old ? await sb.from(T('needs')).update({ active: true, checked: false, note: extra.note || old.note || null, list_id: extra.list_id || old.list_id || null }).eq('id', old.id)
-        : await sb.from(T('needs')).insert({ name: name, owner_id: S.me.id, note: extra.note || null, list_id: extra.list_id || null });
-      if (r.error) throw r.error;
+      var id;
+      if (old) {
+        var r = await sb.from(T('needs')).update({ active: true, checked: false, note: extra.note || old.note || null, list_id: extra.list_id || old.list_id || null }).eq('id', old.id);
+        if (r.error) throw r.error;
+        id = old.id;
+      } else {
+        var r2 = await sb.from(T('needs')).insert({ name: name, owner_id: S.me.id, note: extra.note || null, list_id: extra.list_id || null }).select('id');
+        if (r2.error) throw r2.error;
+        id = r2.data[0].id;
+      }
+      await setNeedAssignees(id, extra.users || []);
     }, old ? L('shReactivated') : null);
   }
   function needEditForm(n) {
     return askForm(L('shEditNeed'), [
       { name: 'name', label: L('shName'), value: n.name },
       { name: 'note', label: L('shNote'), value: n.note },
-      { name: 'list_id', label: L('shList'), type: 'select', value: n.list_id || '', options: listOptions(true) }
+      { name: 'list_id', label: L('shList'), type: 'select', value: n.list_id || '', options: listOptions(true) },
+      { name: 'users', label: L('evAssignTo'), type: 'multi', value: S.needAssign.filter(function (x) { return x.need_id === n.id; }).map(function (x) { return x.user_id; }), options: memberOptions() }
     ]);
   }
 
@@ -760,8 +791,11 @@
   function listMenu(l) {
     var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
     var b = function (act, label, cls) { return '<button type="button" class="btn ' + cls + '" data-act="' + act + '" data-id="' + esc(l.id) + '">' + esc(label) + '</button>'; };
+    var hasChecked = S.needs.some(function (n) { return n.list_id === l.id && n.active && n.checked; });
+    var own = l.owner_id === S.me.id;
     wrap.innerHTML = '<div class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(l.name) + '"><h3>' + esc(l.name) + '</h3><div class="menu">' +
-      b('list-rename', L('shRename'), 'ghost') + b('list-priv', l.is_private ? L('shMakeShared') : L('shMakePrivate'), 'ghost') + b('list-del', L('del'), 'danger') +
+      (hasChecked ? b('list-clear', L('shClearChecked'), 'ghost') : '') +
+      (own ? b('list-rename', L('shRename'), 'ghost') + b('list-priv', l.is_private ? L('shMakeShared') : L('shMakePrivate'), 'ghost') + b('list-del', L('del'), 'danger') : '') +
       '<button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button></div></div>';
     document.body.appendChild(wrap);
     wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('button')) wrap.remove(); });
@@ -1021,10 +1055,11 @@
         var nf = await askForm(L('shAdd'), [
           { name: 'name', label: L('shName'), list: hist },
           { name: 'note', label: L('shNote') },
-          { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true) }
+          { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true) },
+          { name: 'users', label: L('evAssignTo'), type: 'multi', value: [], options: memberOptions() }
         ]);
         if (!nf) return;
-        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id });
+        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users });
       }
       case 'need-menu': { var nd = S.needs.filter(function (x) { return x.id === id; })[0]; if (nd) needMenu(nd, v); return; }
       case 'ev-view': S.evView = v; return render();
@@ -1056,6 +1091,7 @@
         return act(async function () {
           var r = await sb.from(T('needs')).update({ name: nf.name, note: nf.note || null, list_id: nf.list_id || null }).eq('id', id);
           if (r.error) throw r.error;
+          await setNeedAssignees(id, nf.users || []);
         }, L('saved'));
       }
       case 'need-assign': {
