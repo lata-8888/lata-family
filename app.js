@@ -531,20 +531,23 @@
     var mine = n.owner_id === S.me.id, a = [];
     if (mode === 'hist') a.push(['need-react', L('shReactivate'), 'ghost']);
     if (mode === 'none') a.push(['need-assign', L('shAssign'), 'ghost']);
-    if (mine && (mode === 'need' || mode === 'none')) a.push(['need-edit', L('edit'), 'ghost']);
-    if (mine && mode === 'need') a.push(['need-check', n.checked ? L('shUntick') : L('shTick'), 'ghost', n.checked ? '0' : '1']);
+    if (mine && (mode === 'need' || mode === 'none' || mode === 'list')) a.push(['need-edit', L('edit'), 'ghost']);
+    if (mode === 'list' || mode === 'none') a.push(['need-sel', L('shUnselect'), 'ghost', '0']);
     if (mine && mode === 'need') a.push(['need-done', L('shBought'), 'ghost']);
     if (mine && (mode === 'need' || mode === 'hist')) a.push(['need-del', L('del'), 'danger']);
     return a;
   }
+  // Wunschliste (need/assigned): Kästchen = «auf die Einkaufsliste» (selected). Einkaufsliste (list/none): Kästchen = abgehakt (checked), gedimmt unten.
+  // Rechts jeweils «…» und Kästchen.
   function needRow(n, mode) {
-    var chk = !!n.checked;
-    // Einkaufsliste: Name links, Kästchen rechts (abgehakt = gedimmt, kann wieder abgewählt werden); Wunschliste: Name links, «…» rechts
-    var check = (mode === 'list' || mode === 'assigned')
-      ? '<button type="button" role="checkbox" class="tchk' + (chk ? ' on' : '') + '" data-act="need-check" data-id="' + n.id + '" data-val="' + (chk ? '0' : '1') + '" aria-checked="' + chk + '" aria-label="' + esc(L('shBought')) + '" title="' + esc(L('shBought')) + '">' + ICON.check + '</button>' : '';
+    var wish = mode === 'need' || mode === 'assigned', shop = mode === 'list' || mode === 'none';
+    var on = wish ? !!n.selected : !!n.checked;
+    var lbl = wish ? L('shSelect') : L('shBought');
+    var check = (wish || shop)
+      ? '<button type="button" role="checkbox" class="tchk' + (on ? ' on' : '') + '" data-act="' + (wish ? 'need-sel' : 'need-check') + '" data-id="' + n.id + '" data-val="' + (on ? '0' : '1') + '" aria-checked="' + on + '" aria-label="' + esc(lbl) + '" title="' + esc(lbl) + '">' + ICON.check + '</button>' : '';
     var menu = needActions(n, mode).length
       ? '<button type="button" class="hico" data-act="need-menu" data-id="' + n.id + '" data-val="' + mode + '" aria-label="' + esc(L('actions')) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button>' : '';
-    return '<li class="trow shopi' + (mode === 'hist' ? ' tdone' : '') + (mode !== 'hist' && mode !== 'none' && chk ? ' chk' : '') + '">' +
+    return '<li class="trow shopi' + (mode === 'hist' ? ' tdone' : '') + (shop && n.checked ? ' chk' : '') + '">' +
       '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none' || mode === 'assigned', mode === 'need' || mode === 'hist') + '</span></div>' +
       (menu ? '<div class="btnrow">' + menu + '</div>' : '') + check + '</li>';
   }  // «…»-Menü eines Produkts (data-act wird vom globalen Klick-Handler ausgeführt)
@@ -569,19 +572,16 @@
     var uid = S.me.id;
     var byName = function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); };
     var toMe = S.needAssign.filter(function (x) { return x.user_id === uid; }).map(function (x) { return x.need_id; });
-    // eigene aktive Produkte und aktive Produkte, die mir zugeteilt sind
-    var all = S.needs.filter(function (n) { return n.active && (n.owner_id === uid || toMe.indexOf(n.id) > -1); });
-    var open = all.filter(function (n) { return !n.checked; }).sort(byName), done = all.filter(function (n) { return n.checked; }).sort(byName);
+    // eigene aktive Produkte und aktive Produkte, die mir zugeteilt sind; das Kästchen wählt sie für die Einkaufsliste
+    var all = S.needs.filter(function (n) { return n.active && (n.owner_id === uid || toMe.indexOf(n.id) > -1); }).sort(byName);
     var rowOf = function (n) { return needRow(n, n.owner_id === uid ? 'need' : 'assigned'); };
     var hist = S.needs.filter(function (n) { return n.owner_id === uid && !n.active; }).sort(function (a, b) { return String(b.done_at || '').localeCompare(String(a.done_at || '')); });
-    var body = open.length || !done.length ? ulOf(open.map(rowOf), 'shEmpty') : '';
-    if (done.length) body += '<ul class="list">' + done.map(rowOf).join('') + '</ul>';
     var html = '';
-    html += accordion('need-open', L('shNeeded'), open.length, body);
+    html += accordion('need-open', L('shNeeded'), all.length, ulOf(all.map(rowOf), 'shEmpty'));
     html += accordion('need-hist', L('shHistory'), hist.length, ulOf(hist.map(function (n) { return needRow(n, 'hist'); }), 'shHistoryEmpty'));
     return html;
   }  function viewLists() {
-    var active = S.needs.filter(function (n) { return n.active; });
+    var active = S.needs.filter(function (n) { return n.active && n.selected; });   // nur auf der Wunschliste gewählte Produkte
     var none = active.filter(function (n) { return !n.list_id; });
     var html = accordion('lst-none', L('shNoList'), none.length, ulOf(none.map(function (n) { return needRow(n, 'none'); }), 'shEmpty'));
     if (!S.lists.length) html += '<div class="empty"><p>' + esc(L('shNoLists')) + '</p></div>';
@@ -622,7 +622,7 @@
     return act(async function () {
       var id;
       if (old) {
-        var r = await sb.from(T('needs')).update({ active: true, checked: false, note: extra.note || old.note || null, list_id: extra.list_id || old.list_id || null }).eq('id', old.id);
+        var r = await sb.from(T('needs')).update({ active: true, checked: false, selected: false, note: extra.note || old.note || null, list_id: extra.list_id || old.list_id || null }).eq('id', old.id);
         if (r.error) throw r.error;
         id = old.id;
       } else {
@@ -1075,11 +1075,13 @@
       case 'need-check':
         return act(async function () { var r = await sb.from(T('needs')).update({ checked: v === '1' }).eq('id', id); if (r.error) throw r.error; });
       case 'list-clear':
-        return act(async function () { var r = await sb.from(T('needs')).update({ active: false, checked: false }).eq('list_id', id).eq('active', true).eq('checked', true); if (r.error) throw r.error; });
+        return act(async function () { var r = await sb.from(T('needs')).update({ selected: false, checked: false }).eq('list_id', id).eq('active', true).eq('checked', true); if (r.error) throw r.error; });
+      case 'need-sel':
+        return act(async function () { var r = await sb.from(T('needs')).update({ selected: v === '1', checked: false }).eq('id', id); if (r.error) throw r.error; });
       case 'need-done':
-        return act(async function () { var r = await sb.from(T('needs')).update({ active: false, checked: false }).eq('id', id); if (r.error) throw r.error; });
+        return act(async function () { var r = await sb.from(T('needs')).update({ active: false, checked: false, selected: false }).eq('id', id); if (r.error) throw r.error; });
       case 'need-react':
-        return act(async function () { var r = await sb.from(T('needs')).update({ active: true, checked: false }).eq('id', id); if (r.error) throw r.error; }, L('shReactivated'));
+        return act(async function () { var r = await sb.from(T('needs')).update({ active: true, checked: false, selected: false }).eq('id', id); if (r.error) throw r.error; }, L('shReactivated'));
       case 'need-unlist':
         return act(async function () { var r = await sb.from(T('needs')).update({ list_id: null }).eq('id', id); if (r.error) throw r.error; });
       case 'need-del':
