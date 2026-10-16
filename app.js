@@ -248,6 +248,7 @@
     plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
     cart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 10.5h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>',
     edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
     lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     tasks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/></svg>',
@@ -598,7 +599,8 @@
       html += '<section class="acc' + (l.is_private ? ' privlist' : '') + '"><div class="acch">' +
         '<button type="button" class="acct" data-act="sec" data-id="lst-' + l.id + '" aria-expanded="' + open + '">' + lockIcon(l) + esc(l.name) + ' <span class="cnt">(' + itemsOpen.length + ')</span>' +
         (l.is_private ? '<span class="privtag">' + esc(L('shPrivTag')) + '</span>' : '') + '</button>' +
-        dots + '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
+        dots + '<button type="button" class="hico" data-act="list-update" data-id="' + l.id + '" aria-label="' + esc(L('shUpdate')) + '" title="' + esc(L('shUpdate')) + '">' + ICON.refresh + '</button>' +
+        '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
         (open ? '<div class="accbody">' + (itemsOpen.length || !itemsDone.length ? ulOf(itemsOpen.map(function (n) { return needRow(n, 'list'); }), 'shEmpty') : '') +
           (itemsDone.length ? '<ul class="list">' + itemsDone.map(function (n) { return needRow(n, 'list'); }).join('') + '</ul>' : '') + '</div>' : '') + '</section>';
     });
@@ -1082,6 +1084,15 @@
       case 'task-view': S.taskView = v; return render();
       case 'need-check':
         return act(async function () { var r = await sb.from(T('needs')).update({ checked: v === '1' }).eq('id', id); if (r.error) throw r.error; });
+      case 'list-update': {
+        // Gekaufte (abgehakte) Produkte dieser Liste: von der Wunschliste austragen, die Einkaufsliste wird dadurch kürzer
+        var bought = S.needs.filter(function (n) { return n.list_id === id && n.active && n.checked; });
+        if (!bought.length) return toast(L('shNothingChecked'));
+        return act(async function () {
+          var r = await sb.from(T('needs')).update({ active: false, selected: false, checked: false }).in('id', bought.map(function (n) { return n.id; }));
+          if (r.error) throw r.error;
+        }, L('shUpdated', { n: bought.length }));
+      }
       case 'list-clear':
         return act(async function () { var r = await sb.from(T('needs')).update({ selected: false, checked: false }).eq('list_id', id).eq('active', true).eq('checked', true); if (r.error) throw r.error; });
       case 'need-wish':
