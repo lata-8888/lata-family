@@ -279,3 +279,7 @@ textarea[name]{width:100%;font-family:inherit;font-size:1rem;padding:10px 12px;b
 .sugg b{font-weight:500}
 .sugg span{color:var(--muted);font-size:.8rem}
 .sugg.on{opacity:.6}
+/* Vorschlagsfeld deutlich vom Hintergrund abgesetzt */
+.suggbox{background:var(--crown-soft);border:1.5px solid var(--crown);box-shadow:0 6px 16px rgba(0,0,0,.18)}
+.sugg{border-bottom-color:color-mix(in srgb,var(--crown) 25%,transparent)}
+.sugg:hover,.sugg:focus-visible{background:color-mix(in srgb,var(--crown) 14%,transparent)}
