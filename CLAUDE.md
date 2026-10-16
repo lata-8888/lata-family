@@ -3,19 +3,14 @@
 Familien-App (Events, Tasks, Einkauf) im gemeinsamen Supabase-Projekt mit der Vorlage `APP_TMPL_DEV`.
 
 ## Was die App kann
-- **Login** mit Handynummer + PIN (Standard-PIN = letzte 6 Ziffern der Nummer). Keine Selbstregistrierung. Nummernfeld mit Länderauswahl **CH +41 / DE +49 / Andere**, Live-Formatierung, `+49…`/`0041…` wählt das Land automatisch (wie FBRO-App). Gespeichert wird `+41791234567`.
-- **Family-Events:** kommend/vergangen; Datum und Zeit getrennt; pro Event «Teilnahme nötig» (`rsvp`); Antworten «Dabei / Nicht dabei» mit Teilnehmerliste. Anlegen/Bearbeiten mit **+** und **…** auf der Seite (Admin und Event Manager), Löschen im Admin.
-- **Tasks:** jede Person kann jeder Person (auch sich selbst) eine Aufgabe mit Wunschtermin zuweisen. Abschnitte «Für mich», «Von mir», für Admins «Weitere». Abhaken mit Kästchen. Sichtbar nur für Ersteller, Zugewiesene und Admins; Zugewiesene dürfen nur «erledigt» setzen.
-- **Einkauf** (zwei Bereiche, Umschalter oben):
-  - **Was ich brauche:** eigene Produkte, neu definieren oder aus der **Historie reaktivieren**; beim Bearbeiten wird die **Liste** gewählt. Abhaken verschiebt in die Historie.
-  - **Einkaufslisten:** Bereich «(noch in keiner Liste)» und manuell angelegte Listen. Eine Liste kann **privat** sein (nur die Besitzerin/der Besitzer sieht sie; besonders markiert).
-- **Admin:** Events; Personen (Gruppen User/Gäste, Rollen, PIN zurücksetzen); **wiederkehrende Tasks** (täglich/wöchentlich/monatlich, werden beim Öffnen der App erzeugt); **Design**; **Standardsprache**.
-- **Profil:** Name, Sprache, Hell/Dunkel/Automatisch, PIN ändern, App installieren, Abmelden. Banner, solange der Standard-PIN aktiv ist.
-- **Rollen:** `User`, `Gast` (`is_guest`), `Admin` (`is_admin`), `Event Manager` (`is_event_manager`; darf Events verwalten, sieht im Admin nur Events). Gäste sind weder Admin noch Event Manager.
-- **Designs** (Admin wählt, gilt für alle; `app_settings`): `standard`, `holland` (Anzeigename «Orange»), `light` (Anzeigename «Simple»).
-- **Sprachen:** `de`, `en`, `nl`. Standardsprache vom Admin; jede Person kann im Profil überschreiben.
-- **Default-Admin:** *System Administrator*, `+41 79 623 23 45`, Standard-PIN `232345`. Wird von `supabase/schema_lata.sql` bei jedem Lauf angelegt/als Admin sichergestellt, per Trigger geschützt. **PIN beim ersten Login ändern!**
-
+- **Login** mit Handynummer + PIN (Standard-PIN = letzte 6 Ziffern der Nummer). Keine Selbstregistrierung. Nummernfeld mit Länderauswahl **CH +41 / DE +49 / Andere**, Live-Formatierung. Gespeichert wird `+41791234567`.
+- **Agenda** (Tabs **Event Liste | Kalender**): Liste zeigt kommende Events (nach Monat gruppiert, Zeithorizont über «…», höchstens 1 Jahr voraus, Zeit/Ort eingeklappt); Kalender als Monatsraster mit markierten Event-Tagen. Events: Titel, Datum, optional Zeit/Ort/Kommentar, Teilnahme nötig (`rsvp`, Standard aus), Zuteilung an Personen (`event_assignees`), Wiederholung (Einheit | alle n | Wochentag, unbegrenzt, Serie wird bis 1 Jahr voraus erzeugt und beim Öffnen durch Admin/Event Manager verlängert). Bearbeiten/Löschen mit «…»; bei Serien «diesen und alle weiteren».
+- **Tasks:** Tabs «Für mich | Von mir | Weitere (Admin)». Jede Person kann jeder Person (auch sich selbst) eine Aufgabe mit Wunschtermin zuweisen.
+- **Einkauf:** Tab **Wunschliste** (Produkte, die einer Person zugeteilt sind; Kästchen = auf die Einkaufsliste; «Was andere brauchen» zugeklappt) und Tab **Einkaufslisten** (nur gewählte Produkte; Kästchen = abgehakt, abgehakte unten gedimmt; Listen können privat sein; «Abgehakte entfernen» im «…»). Produkte können mehreren Personen zugeteilt werden (`need_assignees`).
+- **Admin:** (alle Bereiche beim Öffnen zu) Agenda (alle Events), Personen (User/Gäste, Rollen, PIN zurücksetzen), wiederkehrende Tasks, Tasks (alle), Standard Design, Standard Sprache.
+- **Profil:** Name und Handynummer direkt antippen, Sprache, Hell/Dunkel/Automatisch, **Design pro Person** (White, Blue, Petrol, Orange; Spalte `design` in `profiles`), PIN, App installieren, Abmelden.
+- **Rollen:** `User`, `Gast`, `Admin`, `Event Manager`. **Designs:** `light` (White), `standard` (Blue), `petrol`, `holland` (Orange). **Sprachen:** de, en, nl.
+- **Default-Admin:** *System Administrator*, `+41 79 623 23 45`, Standard-PIN `232345`. **PIN beim ersten Login ändern!**
 ## Gemeinsames Supabase-Projekt (wichtig)
 Teilt sich das Projekt mit der Vorlage `APP_TMPL_DEV`: gleiche Logins (`auth.users`), aber **eigene Tabellen mit Präfix `lata-`** (`lata-profiles`, `lata-events`, `lata-tasks`, `lata-needs`, `lata-shop_lists`, `lata-recurring_tasks` …) und **eigene Funktionen mit Präfix `lata_`**. Das Präfix kommt aus `config.js` (`TABLE_PREFIX`, `FUNCTION_PREFIX`, `STORAGE_SUFFIX`); im Code immer `T('tabelle')` und `F('funktion')`. Neue Tabellen/Funktionen **immer** mit diesen Präfixen anlegen, die Vorlagen-Tabellen nie anfassen. Personen entfernen löscht den gemeinsamen Login nur, wenn keine andere App ihn braucht; eine Handynummer ändern geht nur in der App, in der die Person zuerst angelegt wurde (`PHONE_SHARED`).
 

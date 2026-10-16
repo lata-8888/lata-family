@@ -256,9 +256,12 @@
   };
 
   /* ---------- Daten laden & Live-Aktualisierung ---------- */
+  var lastRecurring = 0;
   async function loadAll() {
     var uid = S.session.user.id;
-    try { await sb.rpc(F('run_recurring')); } catch (e) { /* ignorieren */ }
+    if (Date.now() - lastRecurring > 30 * 60000) { lastRecurring = Date.now(); try { await sb.rpc(F('run_recurring')); } catch (e) { /* ignorieren */ } }
+    var pEA = Promise.resolve(sb.from(T('event_assignees')).select('*'));   // parallel zu den übrigen Abfragen
+    var pNA = Promise.resolve(sb.from(T('need_assignees')).select('*'));
     var r = await Promise.all([
       sb.from(T('profiles')).select('*').order('name'),
       sb.from(T('events')).select('*').order('starts_at'),
@@ -271,9 +274,9 @@
       sb.from(T('recurring_tasks')).select('*').order('created_at')
     ]);
     r.forEach(function (x) { if (x.error) throw x.error; });
-    var ra = await sb.from(T('event_assignees')).select('*'); if (ra.error) throw ra.error;
+    var ra = await pEA; if (ra.error) throw ra.error;
     S.assign = ra.data || [];
-    var rn = await sb.from(T('need_assignees')).select('*'); if (rn.error) throw rn.error;
+    var rn = await pNA; if (rn.error) throw rn.error;
     S.needAssign = rn.data || [];
     S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.needs = r[7].data; S.rules = r[8].data;
     adminDesign = DESIGNS.some(function (x) { return x.id === r[3].data; }) ? r[3].data : 'standard';
@@ -549,8 +552,8 @@
       ? '<button type="button" role="checkbox" class="tchk' + (on ? ' on' : '') + '" data-act="' + (wish ? 'need-sel' : 'need-check') + '" data-id="' + n.id + '" data-val="' + (on ? '0' : '1') + '" aria-checked="' + on + '" aria-label="' + esc(lbl) + '" title="' + esc(lbl) + '">' + ICON.check + '</button>' : '';
     var menu = needActions(n, mode).length
       ? '<button type="button" class="hico" data-act="need-menu" data-id="' + n.id + '" data-val="' + mode + '" aria-label="' + esc(L('actions')) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button>' : '';
-    return '<li class="trow shopi' + (mode === 'hist' ? ' tdone' : '') + (shop && n.checked ? ' chk' : '') + '">' +
-      '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none' || mode === 'assigned' || mode === 'others', mode === 'need' || mode === 'hist') + '</span></div>' +
+    return '<li class="trow shopi' + (shop && n.checked ? ' chk' : '') + '">' +
+      '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none' || mode === 'assigned' || mode === 'others', mode === 'need') + '</span></div>' +
       (menu ? '<div class="btnrow">' + menu + '</div>' : '') + check + '</li>';
   }  // «…»-Menü eines Produkts (data-act wird vom globalen Klick-Handler ausgeführt)
   function needMenu(n, mode) {
@@ -832,13 +835,6 @@
       return f.elements[n] ? f.elements[n].value.trim() : '';
     }, kind = f.dataset.form;
     if (kind === 'login') return handleLogin(g);
-    if (kind === 'needadd') return needAdd(g('item'));
-    if (kind === 'profile') {
-      return act(async function () {
-        var r = await sb.from(T('profiles')).update({ name: g('name'), language: g('language') }).eq('id', S.me.id); if (r.error) throw r.error;
-        setLang(g('language'));
-      }, L('saved'));
-    }
     if (kind === 'pin') {
       if (!/^\d{6}$/.test(g('pin'))) return toast(L('pinExact'));
       if (pinWeak(g('pin'), S.me.phone)) return toast(L('pinWeak'));
@@ -851,7 +847,7 @@
 
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvt = e; if (S.step === 'app') render(); });
 
-  // Wiederholung wie in Outlook: «Wiederholen alle [n] [Tag|Woche|Monat|Jahr]», Wochentage, «Bis»
+  // Datum-Helfer und automatische Verlängerung unbegrenzter Serien
   function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function oneYear() { var d = new Date(); d.setFullYear(d.getFullYear() + 1); return isoDate(d); }
   // unbegrenzte Serien laufend bis ein Jahr voraus ergänzen (nur Admin/Event Manager, beim Öffnen)
@@ -1100,12 +1096,6 @@
         }, L('saved'));
       case 'need-sel':
         return act(async function () { var r = await sb.from(T('needs')).update({ selected: v === '1', checked: false }).eq('id', id); if (r.error) throw r.error; });
-      case 'need-done':
-        return act(async function () { var r = await sb.from(T('needs')).update({ active: false, checked: false, selected: false }).eq('id', id); if (r.error) throw r.error; });
-      case 'need-react':
-        return act(async function () { var r = await sb.from(T('needs')).update({ active: true, checked: false, selected: false }).eq('id', id); if (r.error) throw r.error; }, L('shReactivated'));
-      case 'need-unlist':
-        return act(async function () { var r = await sb.from(T('needs')).update({ list_id: null }).eq('id', id); if (r.error) throw r.error; });
       case 'need-del':
         return act(async function () { var r = await sb.from(T('needs')).delete().eq('id', id); if (r.error) throw r.error; });
       case 'need-edit': {
