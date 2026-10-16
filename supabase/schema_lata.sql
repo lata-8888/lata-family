@@ -86,25 +86,30 @@ create table if not exists public."lata-shop_lists" (
   is_private boolean not null default false,
   created_at timestamptz not null default now()
 );
-create table if not exists public."lata-needs" (
+-- Produktkatalog: jedes Produkt genau einmal (Name ohne Gross-/Kleinschreibung und Randleerzeichen eindeutig)
+create table if not exists public."lata-products" (
   id uuid primary key default gen_random_uuid(),
   name text not null check (char_length(name) between 1 and 80),
-  note text check (note is null or char_length(note) <= 80),
-  owner_id uuid not null references public."lata-profiles"(id),
-  list_id uuid references public."lata-shop_lists"(id),
-  active boolean not null default true,
-  done_at timestamptz,
-  created_at timestamptz not null default now(),
-  checked boolean not null default false,
-  selected boolean not null default false
+  created_by uuid references public."lata-profiles"(id) on delete set null,
+  created_at timestamptz not null default now()
 );
-create index if not exists "lata-needs_list_idx" on public."lata-needs" (list_id);
-create index if not exists "lata-needs_owner_idx" on public."lata-needs" (owner_id);
-create table if not exists public."lata-need_assignees" (
-  need_id uuid not null references public."lata-needs"(id) on delete cascade,
+create unique index if not exists "lata-products_name_key" on public."lata-products" (lower(btrim(name)));
+
+-- Wunscheintrag: eine Person führt ein Produkt auf ihrer Wunschliste, optional in einer Einkaufsliste
+create table if not exists public."lata-wishes" (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public."lata-products"(id) on delete cascade,
   user_id uuid not null references public."lata-profiles"(id) on delete cascade,
-  primary key (need_id, user_id)
+  created_by uuid references public."lata-profiles"(id) on delete set null,
+  note text check (note is null or char_length(note) <= 80),
+  list_id uuid references public."lata-shop_lists"(id) on delete set null,
+  selected boolean not null default true,
+  checked boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (product_id, user_id)
 );
+create index if not exists "lata-wishes_user_idx" on public."lata-wishes" (user_id);
+create index if not exists "lata-wishes_list_idx" on public."lata-wishes" (list_id);
 
 -- ===== Hilfsfunktionen (security definer, fester search_path) =====
 create or replace function public.lata_default_admin_phone() returns text language sql immutable as $$ select '+41796232345'::text $$;
@@ -123,13 +128,6 @@ $$ select coalesce((select value from public."lata-app_settings" where key = 'la
 create or replace function public.lata_can_see_list(p_list uuid) returns boolean language sql stable security definer set search_path = public as $$
   select p_list is null or exists (
     select 1 from public."lata-shop_lists" l where l.id = p_list and (not l.is_private or l.owner_id = auth.uid())) $$;
-create or replace function public.lata_can_see_need(p_need uuid) returns boolean language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public."lata-needs" n where n.id = p_need and (n.owner_id = auth.uid() or public.lata_can_see_list(n.list_id))) $$;
-create or replace function public.lata_owns_need(p_need uuid) returns boolean language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public."lata-needs" where id = p_need and owner_id = auth.uid()) $$;
-create or replace function public.lata_is_need_assignee(p_need uuid) returns boolean language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public."lata-need_assignees" where need_id = p_need and user_id = auth.uid()) $$;
-
 -- Wiederkehrende Tasks: Fälligkeitsberechnung
 create or replace function public.lata_next_due(p_freq text, p_weekday int, p_month_day int, p_from date) returns date language plpgsql immutable as $$
 declare d date;
@@ -177,15 +175,19 @@ begin
   return new;
 end; $$;
 
-create or replace function public.lata_guard_need_update() returns trigger language plpgsql security definer set search_path = public as $$
+-- bewusst NICHT security definer: current_user muss die Rolle der Sitzung sein (authenticated) bzw. der Funktionsbesitzer bei RPC-Aufrufen
+create or replace function public.lata_guard_wish_update() returns trigger language plpgsql set search_path = public as $$
 begin
-  if auth.uid() is null then return new; end if;
-  if new.owner_id <> old.owner_id then raise exception 'NEED_FORBIDDEN'; end if;
-  if auth.uid() <> old.owner_id and (new.name is distinct from old.name or new.note is distinct from old.note) then
+  -- Aufrufe aus security-definer-Funktionen (Rolle != authenticated) und ohne Login sind nicht eingeschränkt
+  if auth.uid() is null or current_user not in ('authenticated', 'anon') then return new; end if;
+  if new.product_id <> old.product_id or new.user_id <> old.user_id or new.created_by is distinct from old.created_by then
     raise exception 'NEED_FORBIDDEN';
   end if;
-  if new.active and not old.active then new.done_at := null;
-  elsif not new.active and old.active then new.done_at := now(); end if;
+  if auth.uid() = old.user_id then return new; end if;               -- die Person selbst darf alles ändern
+  if new.selected <> old.selected then raise exception 'NEED_FORBIDDEN'; end if;   -- «ausgewählt» nur die Person selbst
+  if auth.uid() is distinct from old.created_by and (new.note is distinct from old.note or new.list_id is distinct from old.list_id) then
+    raise exception 'NEED_FORBIDDEN';                                -- Notiz/Liste: Person oder Zuteilende/r; alle anderen nur «abgehakt»
+  end if;
   return new;
 end; $$;
 
@@ -202,8 +204,8 @@ drop trigger if exists guard_default_admin on public."lata-profiles";
 create trigger guard_default_admin before update on public."lata-profiles" for each row execute function public.lata_guard_default_admin();
 drop trigger if exists guard_task_update on public."lata-tasks";
 create trigger guard_task_update before update on public."lata-tasks" for each row execute function public.lata_guard_task_update();
-drop trigger if exists guard_need_update on public."lata-needs";
-create trigger guard_need_update before update on public."lata-needs" for each row execute function public.lata_guard_need_update();
+drop trigger if exists guard_wish_update on public."lata-wishes";
+create trigger guard_wish_update before update on public."lata-wishes" for each row execute function public.lata_guard_wish_update();
 drop trigger if exists recurring_set_next on public."lata-recurring_tasks";
 create trigger recurring_set_next before insert or update on public."lata-recurring_tasks" for each row execute function public.lata_recurring_set_next();
 
@@ -399,6 +401,74 @@ begin
   return n;
 end; $$;
 
+-- ===== Einkauf: Produkte und Wünsche =====
+-- Produkt (falls neu) anlegen und für die gewählten Personen (Standard: ich) auf die Wunschliste setzen. Gibt die Produkt-ID zurück.
+create or replace function public.lata_add_wish(p_name text, p_note text, p_list uuid, p_users uuid[]) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid; u uuid; users uuid[]; pub boolean;
+begin
+  if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
+  if char_length(nm) not between 1 and 80 then raise exception 'Name fehlt'; end if;
+  if not public.lata_can_see_list(p_list) then raise exception 'NEED_FORBIDDEN'; end if;
+  pub := p_list is null or exists (select 1 from public."lata-shop_lists" where id = p_list and not is_private);
+  select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm);
+  if pid is null then
+    insert into public."lata-products" (name, created_by) values (nm, me) on conflict (lower(btrim(name))) do nothing returning id into pid;
+    if pid is null then select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm); end if;
+  end if;
+  users := case when coalesce(array_length(p_users, 1), 0) = 0 then array[me] else p_users end;
+  foreach u in array users loop
+    if not exists (select 1 from public."lata-profiles" where id = u) then raise exception 'Person nicht gefunden'; end if;
+    insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected)
+    values (pid, u, me, nullif(btrim(coalesce(p_note, '')), ''), case when u = me or pub then p_list end, u = me)
+    on conflict (product_id, user_id) do nothing;
+  end loop;
+  return pid;
+end; $$;
+
+-- Wünschende eines Produkts setzen: eigener Eintrag (Notiz/Liste/ein/aus), Einträge für andere hinzufügen oder – wenn ich sie angelegt habe – entfernen
+create or replace function public.lata_set_wishers(p_product uuid, p_users uuid[], p_note text, p_list uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); users uuid[] := coalesce(p_users, '{}'); u uuid; w record; pub boolean; nt text := nullif(btrim(coalesce(p_note, '')), '');
+begin
+  if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
+  if not exists (select 1 from public."lata-products" where id = p_product) then raise exception 'Produkt nicht gefunden'; end if;
+  if not public.lata_can_see_list(p_list) then raise exception 'NEED_FORBIDDEN'; end if;
+  pub := p_list is null or exists (select 1 from public."lata-shop_lists" where id = p_list and not is_private);
+  foreach u in array users loop
+    if not exists (select 1 from public."lata-profiles" where id = u) then raise exception 'Person nicht gefunden'; end if;
+    if u = me then
+      insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected) values (p_product, me, me, nt, p_list, true)
+      on conflict (product_id, user_id) do update set note = excluded.note, list_id = excluded.list_id;
+    else
+      insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected)
+      values (p_product, u, me, nt, case when pub then p_list end, false) on conflict (product_id, user_id) do nothing;
+    end if;
+  end loop;
+  for w in select * from public."lata-wishes" where product_id = p_product and not (user_id = any (users)) loop
+    if w.user_id = me or w.created_by = me then
+      delete from public."lata-wishes" where id = w.id;
+    elsif public.lata_can_see_list(w.list_id) then
+      raise exception 'NEED_FORBIDDEN';   -- sichtbarer Wunsch einer anderen Person, den ich nicht angelegt habe
+    end if;
+  end loop;
+end; $$;
+
+-- Einkaufsliste aktualisieren: p_remove = gekaufte Wünsche entfernen; sonst nur abwählen (bleiben auf der Wunschliste)
+create or replace function public.lata_list_update(p_list uuid, p_remove boolean) returns integer
+language plpgsql security definer set search_path = public as $$
+declare n integer;
+begin
+  if not public.lata_is_user() or not public.lata_can_see_list(p_list) or p_list is null then raise exception 'NEED_FORBIDDEN'; end if;
+  if p_remove then
+    delete from public."lata-wishes" where list_id = p_list and selected and checked;
+  else
+    update public."lata-wishes" set selected = false, checked = false where list_id = p_list and selected and checked;
+  end if;
+  get diagnostics n = row_count;
+  return n;
+end; $$;
+
 -- ===== RLS =====
 alter table public."lata-app_settings"     enable row level security;  -- bewusst ohne Policy: Zugriff nur über Funktionen
 alter table public."lata-profiles"         enable row level security;
@@ -408,8 +478,8 @@ alter table public."lata-event_responses"  enable row level security;
 alter table public."lata-tasks"            enable row level security;
 alter table public."lata-recurring_tasks"  enable row level security;
 alter table public."lata-shop_lists"       enable row level security;
-alter table public."lata-needs"            enable row level security;
-alter table public."lata-need_assignees"   enable row level security;
+alter table public."lata-products"         enable row level security;
+alter table public."lata-wishes"           enable row level security;
 
 do $$ declare r record; begin
   for r in select schemaname, tablename, policyname from pg_policies where schemaname = 'public' and tablename like 'lata-%' loop
@@ -443,23 +513,20 @@ create policy shop_lists_insert on public."lata-shop_lists" for insert to authen
 create policy shop_lists_update on public."lata-shop_lists" for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy shop_lists_delete on public."lata-shop_lists" for delete to authenticated using (owner_id = auth.uid() or (public.lata_is_admin() and not is_private));
 
-create policy needs_select on public."lata-needs" for select to authenticated
-  using (public.lata_is_user() and (owner_id = auth.uid() or public.lata_can_see_list(list_id) or public.lata_is_need_assignee(id)));
-create policy needs_insert on public."lata-needs" for insert to authenticated
-  with check (public.lata_is_user() and owner_id = auth.uid() and public.lata_can_see_list(list_id));
-create policy needs_update on public."lata-needs" for update to authenticated
-  using (public.lata_is_user() and (owner_id = auth.uid() or public.lata_can_see_list(list_id) or public.lata_is_need_assignee(id)))
-  with check (public.lata_can_see_list(list_id) or owner_id = auth.uid() or public.lata_is_need_assignee(id));
-create policy needs_delete on public."lata-needs" for delete to authenticated
-  using (owner_id = auth.uid() or (public.lata_is_admin() and public.lata_can_see_list(list_id)));
+create policy products_select on public."lata-products" for select to authenticated using (public.lata_is_user());
+create policy products_update on public."lata-products" for update to authenticated
+  using (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_admin())) with check (created_by = auth.uid() or public.lata_is_admin());
+create policy products_delete on public."lata-products" for delete to authenticated using (public.lata_is_admin());
+-- Anlegen von Produkten nur über lata_add_wish (keine insert-Policy)
 
-create policy need_assignees_select on public."lata-need_assignees" for select to authenticated
-  using (public.lata_is_user() and (user_id = auth.uid() or public.lata_can_see_need(need_id)));
-create policy need_assignees_self_add on public."lata-need_assignees" for insert to authenticated
-  with check (user_id = auth.uid() and public.lata_can_see_need(need_id));
-create policy need_assignees_self_del on public."lata-need_assignees" for delete to authenticated using (user_id = auth.uid());
-create policy need_assignees_write on public."lata-need_assignees" for all to authenticated
-  using (public.lata_owns_need(need_id)) with check (public.lata_owns_need(need_id));
+create policy wishes_select on public."lata-wishes" for select to authenticated
+  using (public.lata_is_user() and (user_id = auth.uid() or created_by = auth.uid() or public.lata_can_see_list(list_id)));
+create policy wishes_update on public."lata-wishes" for update to authenticated
+  using (public.lata_is_user() and (user_id = auth.uid() or created_by = auth.uid() or public.lata_can_see_list(list_id)))
+  with check (public.lata_can_see_list(list_id));
+create policy wishes_delete on public."lata-wishes" for delete to authenticated
+  using (user_id = auth.uid() or created_by = auth.uid() or (public.lata_is_admin() and public.lata_can_see_list(list_id)));
+-- Anlegen von Wünschen nur über lata_add_wish / lata_set_wishers (keine insert-Policy)
 
 -- ===== Rechte =====
 -- Nur lata-Tabellen anfassen (Vorlage-Tabellen nie). anon braucht keinen Tabellenzugriff.
@@ -472,6 +539,8 @@ end $$;
 revoke update on public."lata-profiles" from authenticated;
 grant update (name, language, theme, pin_changed, design) on public."lata-profiles" to authenticated;
 revoke insert, delete on public."lata-profiles" from authenticated;
+-- Produkte und Wünsche entstehen nur über die RPCs lata_add_wish / lata_set_wishers
+revoke insert on public."lata-products", public."lata-wishes" from authenticated;
 
 do $$ declare f record; begin
   for f in select p.oid::regprocedure as sig from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -486,12 +555,45 @@ grant execute on function public.lata_app_design(), public.lata_app_language() t
 -- ===== Realtime =====
 do $$ declare t text; begin
   foreach t in array array['lata-profiles','lata-events','lata-event_assignees','lata-event_responses','lata-tasks',
-                           'lata-recurring_tasks','lata-shop_lists','lata-needs','lata-need_assignees'] loop
+                           'lata-recurring_tasks','lata-shop_lists','lata-products','lata-wishes'] loop
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
       execute format('alter publication supabase_realtime add table public.%I', t);
     end if;
   end loop;
 end $$;
+
+-- ===== Einmalige Datenübernahme aus dem alten Modell (lata-needs / lata-need_assignees) =====
+do $$ begin
+  if to_regclass('public."lata-needs"') is not null then
+    if not exists (select 1 from public."lata-products") then
+      insert into public."lata-products" (id, name, created_by, created_at)
+      select distinct on (lower(btrim(name))) id, btrim(name), owner_id, created_at
+        from public."lata-needs" order by lower(btrim(name)), created_at;
+      insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected, checked)
+      select p.id, u.user_id, n.owner_id, n.note, n.list_id, n.selected, n.checked
+        from public."lata-needs" n
+        join public."lata-products" p on lower(btrim(p.name)) = lower(btrim(n.name))
+        cross join lateral (
+          select a.user_id from public."lata-need_assignees" a where a.need_id = n.id
+          union select n.owner_id where not exists (select 1 from public."lata-need_assignees" a where a.need_id = n.id)) u
+       where n.active
+      on conflict (product_id, user_id) do nothing;
+    end if;
+    -- alte Tabellen bleiben als Sicherung (ohne Zugriff, ohne Realtime); später mit drop table entfernen
+    drop trigger if exists guard_need_update on public."lata-needs";
+    if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'lata-needs') then
+      alter publication supabase_realtime drop table public."lata-needs"; end if;
+    if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'lata-need_assignees') then
+      alter publication supabase_realtime drop table public."lata-need_assignees"; end if;
+    alter table public."lata-needs" rename to "lata-needs_legacy";
+    alter table public."lata-need_assignees" rename to "lata-need_assignees_legacy";
+    revoke all on public."lata-needs_legacy", public."lata-need_assignees_legacy" from anon, authenticated;
+  end if;
+end $$;
+drop function if exists public.lata_can_see_need(uuid);
+drop function if exists public.lata_owns_need(uuid);
+drop function if exists public.lata_is_need_assignee(uuid);
+drop function if exists public.lata_guard_need_update();
 
 -- ===== Default-Admin (Standard-PIN 232345 – beim ersten Login ändern!) =====
 select public.lata__create_user('System Administrator', '+41796232345', true);
