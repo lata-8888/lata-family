@@ -171,7 +171,7 @@
           else if (f.type === 'select') html = '<label class="fld"><span>' + esc(f.label) + '</span><select name="' + f.name + '">' + f.options.map(function (o) {
             return '<option value="' + esc(o.v) + '"' + (o.v === f.value ? ' selected' : '') + '>' + esc(o.l) + '</option>';
           }).join('') + '</select></label>';
-          else html = '<label class="fld"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off"' + (f.list ? ' list="dl_' + f.name + '"' : '') + '>' + (f.list ? '<datalist id="dl_' + f.name + '">' + f.list.map(function (x) { return '<option value="' + esc(x) + '"></option>'; }).join('') + '</datalist>' : '') + '</label>';
+          else html = '<label class="fld"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off">' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '') + '</label>';
           // aufeinanderfolgende Felder mit half:true stehen nebeneinander (z. B. Datum | Zeit)
           var prev = fields[i - 1], next = fields[i + 1];
           if (f.half && !(prev && prev.half)) html = '<div class="grid2">' + html;
@@ -210,6 +210,20 @@
         };
         form.addEventListener('change', refresh); refresh();
       }
+      // Vorschlagsliste: zeigt alle bekannten Einträge und reduziert sie beim Tippen (Volltextsuche, alle Wörter müssen vorkommen)
+      fields.forEach(function (f) {
+        if (!f.suggest) return;
+        var inp = form.elements[f.name], box = form.querySelector('.suggbox[data-for="' + f.name + '"]');
+        var paint = function () {
+          var words = inp.value.toLowerCase().split(/\s+/).filter(Boolean);
+          var hits = f.suggest.filter(function (x) { var l = x.n.toLowerCase(); return words.every(function (w) { return l.indexOf(w) > -1; }); });
+          box.innerHTML = hits.map(function (x) { return '<button type="button" class="sugg' + (x.on ? ' on' : '') + '" data-sg="' + esc(x.n) + '"><b>' + esc(x.n) + '</b>' + (x.on ? '<span>' + esc(f.suggestOn) + '</span>' : '') + '</button>'; }).join('');
+          box.hidden = !hits.length;
+        };
+        inp.addEventListener('input', paint);
+        box.addEventListener('click', function (e) { var b = e.target.closest('[data-sg]'); if (b) { inp.value = b.dataset.sg; paint(); inp.focus(); } });
+        paint();
+      });
       var first = form.querySelector('input'); if (first) first.focus();
     });
   }
@@ -553,7 +567,7 @@
       ? '<button type="button" role="checkbox" class="tchk' + (on ? ' on' : '') + '" data-act="' + (wish ? 'need-sel' : 'need-check') + '" data-id="' + n.id + '" data-val="' + (on ? '0' : '1') + '" aria-checked="' + on + '" aria-label="' + esc(lbl) + '" title="' + esc(lbl) + '">' + ICON.check + '</button>' : '';
     var menu = needActions(n, mode).length
       ? '<button type="button" class="hico" data-act="need-menu" data-id="' + n.id + '" data-val="' + mode + '" aria-label="' + esc(L('actions')) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button>' : '';
-    return '<li class="trow shopi' + (shop && n.checked ? ' chk' : '') + '">' +
+    return '<li class="trow shopi' + ((shop || wish) && n.checked ? ' chk' : '') + '">' +
       '<div class="l"><b>' + esc(n.name) + '</b><span>' + needMeta(n, mode === 'list' || mode === 'none' || mode === 'assigned' || mode === 'others', mode === 'need') + '</span></div>' +
       (menu ? '<div class="btnrow">' + menu + '</div>' : '') + check + '</li>';
   }  // «…»-Menü eines Produkts (data-act wird vom globalen Klick-Handler ausgeführt)
@@ -579,7 +593,9 @@
     var byName = function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); };
     var active = S.needs.filter(function (n) { return n.active; });
     // meine Wunschliste; das Kästchen wählt ein Produkt für die Einkaufsliste
-    var mineL = active.filter(onMyWishlist).sort(byName);
+    var mineL = active.filter(onMyWishlist);
+    // gekaufte (abgehakte) Produkte stehen unten und sind gedimmt, wie in der Einkaufsliste
+    mineL.sort(function (a, b) { return (!!a.checked - !!b.checked) || byName(a, b); });
     // was andere wünschen: nur anderen Personen zugeteilt
     var others = active.filter(function (n) { return !onMyWishlist(n) && needUsers(n).length; }).sort(byName);
     var html = '';
@@ -1061,9 +1077,14 @@
       case 'shop-view': S.shopView = v; return render();
       case 'list-menu': { var lm = listById(id); if (lm) listMenu(lm); return; }
       case 'need-new': {
-        var hist = S.needs.filter(function (n) { return n.owner_id === S.me.id && !n.active; }).map(function (n) { return n.name; });
+        // alle bisher bekannten Produkte dieser Person (eigene und auf ihrer Wunschliste), ohne Doppelte
+        var byLow = {}, known = [];
+        S.needs.filter(function (n) { return n.owner_id === S.me.id || onMyWishlist(n); }).sort(function (x, y) { return x.name.localeCompare(y.name, LOCALE[lang]); }).forEach(function (n) {
+          var k = n.name.toLowerCase(), on = n.active && onMyWishlist(n);
+          if (byLow[k]) { byLow[k].on = byLow[k].on || on; } else { byLow[k] = { n: n.name, on: on }; known.push(byLow[k]); }
+        });
         var nf = await askForm(L('shAdd'), [
-          { name: 'name', label: L('shName'), list: hist },
+          { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList') },
           { name: 'note', label: L('shNote') },
           { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true) },
           { name: 'users', label: L('evAssignTo'), type: 'multi', value: [S.me.id], options: memberOptions() }
