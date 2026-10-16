@@ -516,7 +516,8 @@ create policy shop_lists_delete on public."lata-shop_lists" for delete to authen
 create policy products_select on public."lata-products" for select to authenticated using (public.lata_is_user());
 create policy products_update on public."lata-products" for update to authenticated
   using (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_admin())) with check (created_by = auth.uid() or public.lata_is_admin());
-create policy products_delete on public."lata-products" for delete to authenticated using (public.lata_is_admin());
+-- Produkte bleiben im Katalog, bis sie ausdrücklich gelöscht werden (wer sie angelegt hat, oder Admin)
+create policy products_delete on public."lata-products" for delete to authenticated using (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_admin()));
 -- Anlegen von Produkten nur über lata_add_wish (keine insert-Policy)
 
 create policy wishes_select on public."lata-wishes" for select to authenticated
@@ -594,6 +595,8 @@ drop function if exists public.lata_can_see_need(uuid);
 drop function if exists public.lata_owns_need(uuid);
 drop function if exists public.lata_is_need_assignee(uuid);
 drop function if exists public.lata_guard_need_update();
+drop trigger if exists cleanup_product on public."lata-wishes";
+drop function if exists public.lata_cleanup_product();   -- war kurz im Einsatz, Produkte werden nicht mehr automatisch gelöscht
 
 -- ===== Default-Admin (Standard-PIN 232345 – beim ersten Login ändern!) =====
 select public.lata__create_user('System Administrator', '+41796232345', true);

@@ -1,6 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    shProdDel: 'Produkt löschen', shProdDelAsk: 'Produkt «{name}» für alle löschen? Es verschwindet aus der Produktliste und von allen Wunsch- und Einkaufslisten.', shCatalog: 'Weitere Produkte', shCatalogEmpty: 'Keine weiteren Produkte.',
     needForbidden: 'Diese Aktion ist nicht erlaubt.', shNameTaken: 'Ein Produkt mit diesem Namen gibt es schon.',
     evFilter: 'Nur meine Events', evFilterOnTip: 'Filter aktiv: nur meine und nicht zugeteilte Events – antippen, um alle zu zeigen',
     cancel: 'Abbrechen', confirm: 'Bestätigen', save: 'Speichern', saved: 'Gespeichert', error: 'Fehler', edit: 'Bearbeiten', remove: 'Entfernen', removed: 'Entfernt', del: 'Löschen',
@@ -52,6 +53,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    shProdDel: 'Delete product', shProdDelAsk: 'Delete product «{name}» for everyone? It disappears from the product list and from all wish and shopping lists.', shCatalog: 'More products', shCatalogEmpty: 'No more products.',
     needForbidden: 'This action is not allowed.', shNameTaken: 'A product with this name already exists.',
     evFilter: 'My events only', evFilterOnTip: 'Filter on: only my events and unassigned ones – tap to show all',
     cancel: 'Cancel', confirm: 'Confirm', save: 'Save', saved: 'Saved', error: 'Error', edit: 'Edit', remove: 'Remove', removed: 'Removed', del: 'Delete',
@@ -103,6 +105,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    shProdDel: 'Product verwijderen', shProdDelAsk: 'Product «{name}» voor iedereen verwijderen? Het verdwijnt uit de productlijst en van alle wens- en boodschappenlijsten.', shCatalog: 'Overige producten', shCatalogEmpty: 'Geen overige producten.',
     needForbidden: 'Deze actie is niet toegestaan.', shNameTaken: 'Er bestaat al een product met deze naam.',
     evFilter: 'Alleen mijn evenementen', evFilterOnTip: 'Filter aan: alleen mijn en niet-toegewezen evenementen – tik om alles te tonen',
     cancel: 'Annuleren', confirm: 'Bevestigen', save: 'Opslaan', saved: 'Opgeslagen', error: 'Fout', edit: 'Bewerken', remove: 'Verwijderen', removed: 'Verwijderd', del: 'Verwijderen',

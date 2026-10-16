@@ -129,7 +129,7 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-others': false }, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
   var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
@@ -584,6 +584,7 @@
     if (canEditProduct(it.p) && mode !== 'others') a.push(['need-edit', L('edit'), 'ghost']);
     if ((mode === 'list' || mode === 'none') && it.w) a.push(['need-sel', L('shUnselect'), 'ghost', '0']);
     a.push(it.w ? ['need-unwish', L('shWishRemove'), 'ghost'] : ['need-wish', L('shWishAdd'), 'ghost']);
+    if (canRename(it.p)) a.push(['prod-del', L('shProdDel'), 'danger']);   // ausdrücklich löschen: für alle
     return a;
   }
   function needRow(it, mode) {
@@ -627,6 +628,10 @@
     var html = '';
     html += accordion('need-open', L('shNeeded'), mineL.length, ulOf(mineL.map(function (it) { return needRow(it, it.w.created_by === uid || !it.w.created_by ? 'need' : 'assigned'); }), 'shEmpty'));
     html += accordion('need-others', L('shOthers'), others.length, ulOf(others.map(function (it) { return needRow(it, 'others'); }), 'shOthersEmpty'));
+    // Produktliste: Produkte, die aktuell niemand wünscht – bleiben erhalten, bis sie ausdrücklich gelöscht werden
+    var wished = {}; S.wishes.forEach(function (w) { wished[w.product_id] = true; });
+    var catalog = S.products.filter(function (p) { return !wished[p.id]; }).map(function (p) { return { p: p, w: null, ws: [], listId: '' }; }).sort(byItem);
+    html += accordion('need-catalog', L('shCatalog'), catalog.length, ulOf(catalog.map(function (it) { return needRow(it, 'catalog'); }), 'shCatalogEmpty'));
     return html;
   }  function viewLists() {
     var sel = S.wishes.filter(function (w) { return w.selected; });   // nur auf der Wunschliste gewählte Produkte
@@ -1130,6 +1135,12 @@
       case 'need-wish': {
         var wp = productById(id); if (!wp) return;
         return act(async function () { var r = await sb.rpc(F('add_wish'), { p_name: wp.name, p_note: null, p_list: null, p_users: [S.me.id] }); if (r.error) throw r.error; }, L('saved'));
+      }
+      case 'prod-del': {
+        var dp = productById(id);
+        if (dp && await askConfirm(L('shProdDel'), L('shProdDelAsk', { name: dp.name }), true))
+          return act(async function () { var r = await sb.from(T('products')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
+        return;
       }
       case 'need-unwish':
         return act(async function () { var r = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; }, L('saved'));
