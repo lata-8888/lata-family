@@ -543,9 +543,11 @@
 
   /* ---------- Einkauf: «Was ich brauche» (eigene Produkte, Historie) und «Einkaufslisten» (gemeinsam oder privat) ---------- */
   function listById(id) { return S.lists.filter(function (x) { return x.id === id; })[0] || null; }
+  function byName(a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); }
+  function sortedLists() { return S.lists.slice().sort(byName); }   // Listen immer alphabetisch
   function listOptions(withNone) {
     var o = withNone ? [{ v: '', l: L('shNoList') }] : [];
-    return o.concat(S.lists.map(function (l) { return { v: l.id, l: l.name + (l.is_private ? ' (' + L('shPrivTag').toLowerCase() + ')' : '') }; }));
+    return o.concat(sortedLists().map(function (l) { return { v: l.id, l: l.name + (l.is_private ? ' (' + L('shPrivTag').toLowerCase() + ')' : '') }; }));
   }
   function lockIcon(l) { return l && l.is_private ? '<span class="lock" title="' + esc(L('shPrivTag')) + '">' + ICON.lock + '</span>' : ''; }
   function needMeta(n, showOwner, showList) {
@@ -603,12 +605,10 @@
   }
   function viewNeeds() {
     var uid = S.me.id;
-    var byName = function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); };
     var active = S.needs.filter(function (n) { return n.active; });
     // meine Wunschliste; das Kästchen wählt ein Produkt für die Einkaufsliste
     var mineL = active.filter(onMyWishlist);
-    // gekaufte (abgehakte) Produkte stehen unten und sind gedimmt, wie in der Einkaufsliste
-    mineL.sort(function (a, b) { return (!!a.checked - !!b.checked) || byName(a, b); });
+    mineL.sort(byName);   // Wunschliste immer alphabetisch
     // was andere wünschen: nur anderen Personen zugeteilt
     var others = active.filter(function (n) { return !onMyWishlist(n) && needUsers(n).length; }).sort(byName);
     var html = '';
@@ -617,11 +617,11 @@
     return html;
   }  function viewLists() {
     var active = S.needs.filter(function (n) { return n.active && n.selected; });   // nur auf der Wunschliste gewählte Produkte
-    var none = active.filter(function (n) { return !n.list_id; });
+    var none = active.filter(function (n) { return !n.list_id; }).sort(byName);
     var html = accordion('lst-none', L('shNoList'), none.length, ulOf(none.map(function (n) { return needRow(n, 'none'); }), 'shEmpty'));
     if (!S.lists.length) html += '<div class="empty"><p>' + esc(L('shNoLists')) + '</p></div>';
-    S.lists.forEach(function (l) {
-      var items = active.filter(function (n) { return n.list_id === l.id; });
+    sortedLists().forEach(function (l) {
+      var items = active.filter(function (n) { return n.list_id === l.id; }).sort(byName);
       var itemsOpen = items.filter(function (n) { return !n.checked; }), itemsDone = items.filter(function (n) { return n.checked; });
       var dots = (l.owner_id === S.me.id || itemsDone.length) ? '<button type="button" class="hico" data-act="list-menu" data-id="' + l.id + '" aria-label="' + esc(L('shManage')) + '" title="' + esc(L('shManage')) + '">' + ICON.dots + '</button>' : '';
       var open = S.sec['lst-' + l.id] !== false;
