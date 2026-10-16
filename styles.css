@@ -272,7 +272,7 @@ textarea[name]{width:100%;font-family:inherit;font-size:1rem;padding:10px 12px;b
 :root[data-design] .cceh b{font-family:var(--font);font-weight:400;font-size:1.15rem}
 
 /* Vorschlagsliste mit Suche (Produkt hinzufügen) */
-.suggbox{max-height:180px;overflow:auto;margin-top:6px;border:1px solid var(--line);border-radius:var(--r-btn,10px);background:var(--surface)}
+.suggbox{box-sizing:border-box;width:100%;max-height:180px;overflow:auto;margin-top:6px;border:1px solid var(--line);border-radius:var(--r-btn,10px);background:var(--surface)}
 .suggbox[hidden]{display:none}
 .sugg{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:var(--ink);cursor:pointer}
 .sugg:last-child{border-bottom:0}

@@ -216,7 +216,7 @@
         var inp = form.elements[f.name], box = form.querySelector('.suggbox[data-for="' + f.name + '"]');
         var paint = function () {
           var words = inp.value.toLowerCase().split(/\s+/).filter(Boolean);
-          var hits = f.suggest.filter(function (x) { var l = x.n.toLowerCase(); return words.every(function (w) { return l.indexOf(w) > -1; }); });
+          var hits = !words.length ? [] : f.suggest.filter(function (x) { var l = x.n.toLowerCase(); return words.every(function (w) { return l.indexOf(w) > -1; }); });
           box.innerHTML = hits.map(function (x) { return '<button type="button" class="sugg' + (x.on ? ' on' : '') + '" data-sg="' + esc(x.n) + '"><b>' + esc(x.n) + '</b>' + (x.on ? '<span>' + esc(f.suggestOn) + '</span>' : '') + '</button>'; }).join('');
           box.hidden = !hits.length;
         };
