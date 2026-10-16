@@ -65,6 +65,7 @@ p{margin:0}
 .hico svg[fill=currentColor]{fill:currentColor;stroke:none}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .addbtn{width:44px;height:40px;color:var(--crown);border:1.5px solid var(--line);border-radius:var(--r-btn);background:var(--surface)}
+.addbtn.on{background:var(--crown);color:var(--surface);border-color:var(--crown)}
 .addbtn svg{width:24px;height:24px;stroke-width:2.4}
 
 /* Antwort-Knöpfe (Dabei / Nicht dabei / Teilnehmer) */

@@ -266,6 +266,7 @@
     edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
     lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     tasks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/></svg>',
+    filter: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>',
     dots: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
     chev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'
   };
@@ -405,6 +406,16 @@
     var n = parseInt(v, 10);
     return isNaN(n) ? 3 : n;
   }
+  // Filter «Meine Events»: zeigt Events ohne Zuteilung und solche, denen ich zugeteilt bin (nur auf diesem Gerät gespeichert)
+  function evFilterOn() {
+    try { return localStorage.getItem('app-ev-filter' + SFX) === '1'; } catch (e) { return false; }
+  }
+  function agendaEvents() {
+    if (!evFilterOn()) return S.events;
+    var withAssignee = {}, mine = {};
+    S.assign.forEach(function (x) { withAssignee[x.event_id] = true; if (x.user_id === S.me.id) mine[x.event_id] = true; });
+    return S.events.filter(function (e) { return !withAssignee[e.id] || mine[e.id]; });
+  }
   function monthLabel(iso) { return new Date(iso).toLocaleDateString(LOCALE[lang], { month: 'long', year: 'numeric' }); }
   // Events mit Monatsüberschrift gruppiert (wie in der FBRO-App)
   function monthList(events) {
@@ -422,7 +433,7 @@
     var base = S.calMonth ? new Date(S.calMonth) : new Date(now.getFullYear(), now.getMonth(), 1);
     var y = base.getFullYear(), m = base.getMonth();
     var byDay = {};
-    S.events.forEach(function (e) { var k = isoDate(new Date(e.starts_at)); (byDay[k] = byDay[k] || []).push(e); });
+    agendaEvents().forEach(function (e) { var k = isoDate(new Date(e.starts_at)); (byDay[k] = byDay[k] || []).push(e); });
     var lead = (new Date(y, m, 1).getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate(), weeks = Math.ceil((lead + dim) / 7);
     var todayKey = isoDate(now);
     var sel = S.calDay && S.calDay.slice(0, 7) === isoDate(base).slice(0, 7) ? S.calDay : '';
@@ -449,9 +460,10 @@
   function viewEvents() {
     var limit = Date.now() - 3 * 3600e3;
     var yc = new Date(); yc.setFullYear(yc.getFullYear() + 1); var yearCut = yc.getTime();   // Agenda zeigt höchstens ein Jahr voraus
-    var up = S.events.filter(function (e) { var t = new Date(e.starts_at).getTime(); if (e.time_set === false) t += 86400000;   // ohne Uhrzeit: bis Tagesende aktuell
+    var evs0 = agendaEvents();
+    var up = evs0.filter(function (e) { var t = new Date(e.starts_at).getTime(); if (e.time_set === false) t += 86400000;   // ohne Uhrzeit: bis Tagesende aktuell
       return t >= limit && t < yearCut; });
-    var past = S.events.filter(function (e) { return new Date(e.starts_at).getTime() + (e.time_set === false ? 86400000 : 0) < limit; }).reverse();
+    var past = evs0.filter(function (e) { return new Date(e.starts_at).getTime() + (e.time_set === false ? 86400000 : 0) < limit; }).reverse();
     var hz = evHorizon(), cut = null;
     if (hz > 0) { var c = new Date(); c.setMonth(c.getMonth() + hz); cut = c.getTime(); }
     var near = cut === null ? up : up.filter(function (e) { return new Date(e.starts_at).getTime() < cut; });
@@ -459,6 +471,7 @@
     // «…» stellt den Zeithorizont ein (alle), «+» legt Events an (Admins und Event Manager)
     var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navEvents')) + '</h1></div>' +
       '<button type="button" class="hico addbtn" data-act="ev-horizon" aria-label="' + esc(L('evHorizonTitle')) + '" title="' + esc(L('evHorizonTitle')) + '">' + ICON.dots + '</button>' +
+      '<button type="button" class="hico addbtn' + (evFilterOn() ? ' on' : '') + '" data-act="ev-filter" aria-pressed="' + evFilterOn() + '" aria-label="' + esc(L('evFilter')) + '" title="' + esc(L(evFilterOn() ? 'evFilterOnTip' : 'evFilter')) + '">' + ICON.filter + '</button>' +
       (canManageEvents() ? '<button type="button" class="hico addbtn" data-act="ev-new" aria-label="' + esc(L('evNew')) + '" title="' + esc(L('evNew')) + '">' + ICON.plus + '</button>' : '') + '</div>';
     // zwei Register: Liste | Kalender
     var evv = S.evView === 'cal' ? 'cal' : 'list';
@@ -1246,6 +1259,9 @@
         try { localStorage.setItem('app-ev-horizon' + SFX, hf.months); } catch (e2) { /* ignorieren */ }
         return render();
       }
+      case 'ev-filter':
+        try { localStorage.setItem('app-ev-filter' + SFX, evFilterOn() ? '0' : '1'); } catch (e3) { /* ignorieren */ }
+        return render();
       case 'ev-new': return eventForm(null);
       case 'ev-edit': return eventForm(ev);
       case 'ev-del': return deleteEvent(ev);

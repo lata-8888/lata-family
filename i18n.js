@@ -1,6 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    evFilter: 'Nur meine Events', evFilterOnTip: 'Filter aktiv: nur meine und nicht zugeteilte Events – antippen, um alle zu zeigen',
     cancel: 'Abbrechen', confirm: 'Bestätigen', save: 'Speichern', saved: 'Gespeichert', error: 'Fehler', edit: 'Bearbeiten', remove: 'Entfernen', removed: 'Entfernt', del: 'Löschen',
     navEvents: 'Agenda', navProfile: 'Profil', navAdmin: 'Admin', setupTitle: 'Einrichtung',
     fullName: 'Name', phone: 'Handynummer', phoneCountry: 'Land', phoneOther: 'Andere',
@@ -50,6 +51,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    evFilter: 'My events only', evFilterOnTip: 'Filter on: only my events and unassigned ones – tap to show all',
     cancel: 'Cancel', confirm: 'Confirm', save: 'Save', saved: 'Saved', error: 'Error', edit: 'Edit', remove: 'Remove', removed: 'Removed', del: 'Delete',
     navEvents: 'Agenda', navProfile: 'Profile', navAdmin: 'Admin', setupTitle: 'Setup',
     fullName: 'Name', phone: 'Mobile number', phoneCountry: 'Country', phoneOther: 'Other',
@@ -99,6 +101,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    evFilter: 'Alleen mijn evenementen', evFilterOnTip: 'Filter aan: alleen mijn en niet-toegewezen evenementen – tik om alles te tonen',
     cancel: 'Annuleren', confirm: 'Bevestigen', save: 'Opslaan', saved: 'Opgeslagen', error: 'Fout', edit: 'Bewerken', remove: 'Verwijderen', removed: 'Verwijderd', del: 'Verwijderen',
     navEvents: 'Agenda', navProfile: 'Profiel', navAdmin: 'Admin', setupTitle: 'Configuratie',
     fullName: 'Naam', phone: 'Mobiel nummer', phoneCountry: 'Land', phoneOther: 'Overig',
