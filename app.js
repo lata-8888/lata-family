@@ -1159,7 +1159,7 @@
       { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
       { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })), group: true },
       Object.assign(favPeopleField(haveEv, true, true), { group: true }),
-      { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, group: true }
+      { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, group: true, half: true }
     ];
     // Änderungen optional auch für die folgenden Termine einer Serie übernehmen
     if (ev && ev.series_id && S.events.filter(function (x) { return x.series_id === ev.series_id; }).length > 1) fields.push({ name: 'follow', label: L('evFollow'), type: 'checkbox', value: true, group: true });
@@ -1173,7 +1173,7 @@
         : L('evSeriesPlain', { count: cnt }) });
     }
     // Wiederholung beim Anlegen oder bei einem Einzeltermin (Serie beginnt dann mit diesem Termin)
-    if (!(ev && ev.series_id)) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false, group: true }); fields.push({ name: 'rec', type: 'recurrence', group: true }); }
+    if (!(ev && ev.series_id)) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false, group: true, half: true }); fields.push({ name: 'rec', type: 'recurrence', group: true }); }
     var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null);
     if (!f) return;
     if (f.__extra) return deleteEvent(ev);
