@@ -166,6 +166,9 @@
             return '<label class="catopt" style="--c:' + o.c + '"><input type="radio" name="' + f.name + '" value="' + esc(o.v) + '"' + (o.v === (f.value || '') ? ' checked' : '') + '><i></i><em>' + esc(o.l) + '</em></label>';
           }).join('') + '</div></div>';
           else if (f.type === 'textarea') html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><textarea name="' + f.name + '" rows="' + (f.inline ? 2 : 3) + '">' + esc(f.value || '') + '</textarea></label>';
+          else if (f.type === 'multi' && f.chips) html = '<div class="fld"><span>' + esc(f.label) + '</span><div class="catpick">' + f.options.map(function (o, k) {
+            return '<label class="catopt" style="--c:' + PCOLORS[k % PCOLORS.length] + '"><input type="checkbox" name="' + f.name + '" value="' + esc(o.v) + '"' + ((f.value || []).indexOf(o.v) > -1 || o.lock ? ' checked' : '') + (o.lock ? ' disabled' : '') + '><i></i><em>' + esc(o.l) + '</em></label>';
+          }).join('') + '</div></div>';
           else if (f.type === 'multi') {
             var boxes = '<div class="chklist">' + f.options.map(function (o) {
               return '<label class="check"><input type="checkbox" name="' + f.name + '" value="' + esc(o.v) + '"' + ((f.value || []).indexOf(o.v) > -1 || o.lock ? ' checked' : '') + (o.lock ? ' disabled' : '') + '><span>' + esc(o.l) + '</span></label>';
@@ -631,8 +634,9 @@
 
   // «Favorit für» (Dropdown, 0–n Personen) für Events und Tasks: Verwalter (Ersteller/in, Admins, Event Manager) ändern alle;
   // alle anderen können Personen hinzufügen und sich selbst abwählen – wer schon Favorit ist, bleibt gesperrt (ausser ich selbst)
-  function favPeopleField(have, canManage) {
-    return { name: 'users', label: L('shFavFor'), type: 'multi', dropdown: true,
+  var PCOLORS = ['#2a7bbf', '#8a55c8', '#1f9d6b', '#e07b12', '#c4488a', '#1aa3ad', '#6b7686', '#9c7248'];   // Farben der Personen-Felder
+  function favPeopleField(have, canManage, chips) {
+    return { name: 'users', label: L('shFavFor'), type: 'multi', dropdown: !chips, chips: !!chips,
       value: canManage ? have : (have.indexOf(S.me.id) > -1 ? [S.me.id] : []),
       options: memberOptions().map(function (o) { return { v: o.v, l: o.l, lock: !canManage && have.indexOf(o.v) > -1 && o.v !== S.me.id }; }) };
   }
@@ -1123,7 +1127,7 @@
   }
   // Personen ohne Verwalterrechte (kein Admin/Event Manager) sehen nur «Favorit für»: Personen hinzufügen, sich selbst abwählen (bei Serien ab diesem Termin)
   async function eventFavForm(ev, have) {
-    var f = await askForm(L('evEdit'), [favPeopleField(have, false)]);
+    var f = await askForm(L('evEdit'), [favPeopleField(have, false, true)]);
     if (!f) return;
     var sel = f.users || [], add = sel.filter(function (u) { return have.indexOf(u) < 0; });
     var dropMe = have.indexOf(S.me.id) > -1 && sel.indexOf(S.me.id) < 0;
@@ -1154,7 +1158,7 @@
       { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: 2 },
       { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
       { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })), group: true },
-      Object.assign(favPeopleField(haveEv, true), { group: true }),
+      Object.assign(favPeopleField(haveEv, true, true), { group: true }),
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, group: true }
     ];
     // Änderungen optional auch für die folgenden Termine einer Serie übernehmen
