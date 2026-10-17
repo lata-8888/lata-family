@@ -498,10 +498,10 @@
     return '<button type="button" class="' + cls + '" data-act="cal-day" data-val="' + key + '" aria-pressed="' + (key === sel) + '"><span class="dn">' + dn + '</span>' + ICON.cal +
       (evs.length > 1 ? '<span class="cn">' + evs.length + '</span>' : '') + (fav ? '<span class="cfav" aria-hidden="true">' + ICON.star + '</span>' : '') + '</button>';
   }
-  // Wochenansicht: wie der Monat aufgebaut (Wochentage oben, je Tag eine Spalte), gezeigt wird 6–21 Uhr ohne Zeitangaben;
-  // Termine als Blöcke an ihrer Uhrzeit, ganztägige/mehrtägige Events als Chips oben in der Spalte
+  // Wochenansicht: wie der Monat aufgebaut (Wochentage oben, je Tag eine Spalte), gezeigt wird 6–24 Uhr ohne Zeitangaben;
+  // Termine als Blöcke an ihrer Uhrzeit, ganztägige/mehrtägige Events als Chips oben in der Spalte; Hilfslinien alle 3 Stunden
   function weekTimetable(from, byDay, sel, todayKey) {
-    var H0 = 6, H1 = 21, HP = 16, days = [], segs = {}, allday = {};
+    var H0 = 6, H1 = 24, HP = 14, days = [], segs = {}, allday = {};   // 6–24 Uhr; Linien alle 3 Stunden (CSS)
     for (var c = 0; c < 7; c++) {
       var d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + c), k = isoDate(d);
       var ds = d.getTime(), de = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
@@ -534,7 +534,7 @@
       return '<div class="wkcol' + (dy.k === todayKey ? ' today' : '') + (dy.k === sel ? ' sel' : '') + '">' +
         '<button type="button" class="wkday" data-act="cal-day" data-val="' + dy.k + '" aria-pressed="' + (dy.k === sel) + '">' + dy.d.getDate() + '</button>' +
         (anyAll ? '<div class="wkad">' + chips + '</div>' : '') +
-        '<div class="wkbody" style="height:' + (H1 - H0) * HP + 'px">' + blocks + nowLine + '</div></div>';
+        '<div class="wkbody" style="height:' + (H1 - H0) * HP + 'px;--hp:' + HP + 'px">' + blocks + nowLine + '</div></div>';
     }).join('') + '</div>';
     // Legende: Kategorien, die in dieser Woche vorkommen
     var used = {}; days.forEach(function (dy) { (byDay[dy.k] || []).forEach(function (e) { if (catOf(e)) used[e.category] = true; }); });
