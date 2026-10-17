@@ -35,7 +35,7 @@ Vanilla-JS-PWA ohne Build, GitHub Pages + Supabase (Auth, Postgres, RLS, Realtim
 12. Der Webschutz mancher VPNs/Virenscanner (z. B. NordVPN «Blocker für schädliche Websites») kann Skripte neuer Seiten blockieren (leere Seite am Desktop, Status 204) – nicht ein App-Fehler.
 
 ## Arbeitsweise
-- Neue Tabelle ⇒ RLS + Policies + Realtime in `schema_lata.sql` (idempotent) **und** auf `APP_TMPL_DEV` per Migration anwenden.
+- Neue Tabelle ⇒ RLS + Policies + Realtime in `schema_lata.sql` (idempotent) und auf **`lata-family`** per Migration anwenden. **`APP_TMPL_DEV` wird nie angefasst** (weder Migration noch Daten schreiben, auch nicht «nachziehen» oder abgleichen), ausser der Benutzer sagt es ausdrücklich. Lesen nur, wenn ausdrücklich verlangt.
 - Nach jeder Änderung Klammerprüfung/Syntaxtest; wenn `node` verfügbar: `node tools/check.js`. Vor jedem Deploy Skill **app-deploy**.
 - Hochladen per GitHub-Web-Upload ins Repo-Root (keine Unterordner möglich: `favicon-48.png` liegt deshalb im Root).
 
