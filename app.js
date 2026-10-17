@@ -571,7 +571,6 @@
   function myWish(pid) { return S.wishes.filter(function (w) { return w.product_id === pid && w.user_id === S.me.id; })[0] || null; }
   function wishersOf(pid) { return S.wishes.filter(function (w) { return w.product_id === pid; }); }
   function canRename(p) { return p.created_by === S.me.id || isAdmin(); }
-  function canEditProduct(p) { return !!myWish(p.id) || canRename(p); }
   // Wünsche nach Produkt gruppieren → Items, alphabetisch
   function groupItems(ws, listId) {
     var g = {}, order = [];
@@ -594,15 +593,6 @@
   // Zeile eines Produkts; mode: fav (meine Favoriten) | more (weitere Produkte) | list (in einer Einkaufsliste) | none (Favorit ohne Liste)
   // Rechts: «…», Stern (gefüllt = Favorit) und Kästchen. Favoriten: Kästchen = «auf die Einkaufsliste» (selected).
   // Einkaufsliste: Kästchen = gekauft (checked) für alle Wünschenden der Zeile, gedimmt unten.
-  function needActions(it, mode) {
-    var a = [];
-    if (mode === 'none') a.push(['need-assign', L('shAssign'), 'ghost']);
-    if (canEditProduct(it.p)) a.push(['need-edit', L('edit'), 'ghost']);
-    if ((mode === 'list' || mode === 'none') && it.w) a.push(['need-sel', L('shUnselect'), 'ghost', '0']);
-    a.push(['prod-assign', L('shFavOf'), 'ghost']);
-    if (canRename(it.p)) a.push(['prod-del', L('shProdDel'), 'danger']);   // ausdrücklich löschen: für alle
-    return a;
-  }
   function needRow(it, mode) {
     var fav = mode === 'fav', shop = mode === 'list' || mode === 'none';
     var bought = it.ws.length > 0 && it.ws.every(function (x) { return x.checked; });
@@ -612,19 +602,12 @@
       ? '<button type="button" role="checkbox" class="tchk' + (on ? ' on' : '') + '" data-act="' + (fav ? 'need-sel' : 'need-check') + '" data-id="' + it.p.id + '" data-val="' + (fav ? (on ? '0' : '1') : (on ? '0' : '1') + ':' + it.listId) + '" aria-checked="' + on + '" aria-label="' + esc(lbl) + '" title="' + esc(lbl) + '">' + ICON.check + '</button>' : '';
     var isFav = !!it.w, favLbl = isFav ? L('shFavRemove') : L('shFavAdd');
     var star = '<button type="button" class="hico star' + (isFav ? ' on' : '') + '" data-act="' + (isFav ? 'need-unwish' : 'need-wish') + '" data-id="' + it.p.id + '" aria-pressed="' + isFav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button>';
-    var menu = '<button type="button" class="hico" data-act="need-menu" data-id="' + it.p.id + '" data-val="' + mode + '" aria-label="' + esc(L('actions')) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button>';
+    var menu = '<button type="button" class="hico" data-act="need-edit" data-id="' + it.p.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>';
     return '<li class="trow shopi' + ((fav ? it.w.checked : shop && bought) ? ' chk' : '') + '">' +
       '<div class="l"><b>' + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
       '<div class="btnrow">' + menu + star + '</div>' + (check || '<span class="tspace" aria-hidden="true"></span>') + '</li>';
-  }  // «…»-Menü eines Produkts (data-act wird vom globalen Klick-Handler ausgeführt)
-  function needMenu(it, mode) {
-    var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
-    wrap.innerHTML = '<div class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(it.p.name) + '"><h3>' + esc(it.p.name) + '</h3><div class="menu">' +
-      needActions(it, mode).map(function (x) { return '<button type="button" class="btn ' + x[2] + '" data-act="' + x[0] + '" data-id="' + esc(it.p.id) + '"' + (x[3] != null ? ' data-val="' + x[3] + '"' : '') + '>' + esc(x[1]) + '</button>'; }).join('') +
-      '<button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button></div></div>';
-    document.body.appendChild(wrap);
-    wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('button')) wrap.remove(); });
-  }  function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
+  }
+  function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
   function viewShop() {
     var needView = S.shopView !== 'lists';
     var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1></div>' +
@@ -697,7 +680,7 @@
       fields.push({ name: 'list_id', label: L('shList'), type: 'select', value: w.list_id || '', options: listOptions(true), inline: true });
     }
     fields.push(favForField(p, w ? [S.me.id] : []));
-    return askForm(L('shEditNeed'), fields);
+    return askForm(L('shEditNeed'), fields, null, null, canRename(p) ? L('shProdDel') : null);   // «Produkt löschen» unten im Dialog
   }
 
   function viewProfile() {
@@ -1121,7 +1104,6 @@
         if (!nf) return;
         return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users });
       }
-      case 'need-menu': { var np = productById(id); if (np) needMenu({ p: np, w: myWish(np.id), ws: [] }, v); return; }
       case 'ev-view': S.evView = v; return render();
       case 'ev-card': S.open['evc:' + id] = !S.open['evc:' + id]; return render();
       case 'cal-day': S.calDay = v; return render();
@@ -1151,12 +1133,6 @@
         var wp = productById(id); if (!wp) return;
         return act(async function () { var r = await sb.rpc(F('add_wish'), { p_name: wp.name, p_note: null, p_list: null, p_users: [S.me.id] }); if (r.error) throw r.error; }, L('saved'));
       }
-      case 'prod-del': {
-        var dp = productById(id);
-        if (dp && await askConfirm(L('shProdDel'), L('shProdDelAsk', { name: dp.name }), true))
-          return act(async function () { var r = await sb.from(T('products')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
-        return;
-      }
       case 'need-unwish':
         return act(async function () { var r = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; }, L('saved'));
       case 'need-sel':
@@ -1165,6 +1141,11 @@
         var ne = productById(id); if (!ne) return;
         var nfe = await needEditForm(ne);
         if (!nfe) return;
+        if (nfe.__extra) {   // «Produkt löschen» (unten im Dialog): für alle, nur nach Rückfrage
+          if (await askConfirm(L('shProdDel'), L('shProdDelAsk', { name: ne.name }), true))
+            return act(async function () { var r = await sb.from(T('products')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
+          return;
+        }
         return act(async function () {
           var newName = String(nfe.name == null ? ne.name : nfe.name).trim();
           if (!newName) throw new Error(L('shMissing'));
@@ -1178,22 +1159,6 @@
             var r = await sb.from(T('wishes')).update({ note: nfe.note || null, list_id: nfe.list_id || null }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error;
           }
         }, L('saved'));
-      }
-      case 'prod-assign': {
-        // «Zum Favorit von … machen»: das Produkt bei anderen Personen zu den Favoriten hinzufügen (entfernen kann es nur die Person selbst mit dem Stern)
-        var ap = productById(id); if (!ap) return;
-        var have = {}; wishersOf(id).forEach(function (w) { have[w.user_id] = true; });
-        var opts = memberOptions().filter(function (o) { return !have[o.v]; });
-        if (!opts.length) return toast(L('shFavAll'));
-        var af2 = await askForm(L('shFavOf'), [{ name: 'users', label: L('shFavFor'), type: 'multi', dropdown: true, value: [], options: opts }]);
-        if (!af2 || !af2.users || !af2.users.length) return;
-        return act(async function () { var r = await sb.rpc(F('add_wish'), { p_name: ap.name, p_note: null, p_list: null, p_users: af2.users }); if (r.error) throw r.error; }, L('saved'));
-      }
-      case 'need-assign': {
-        if (!S.lists.length) return toast(L('shNoLists'));
-        var af = await askForm(L('shAssignTitle'), [{ name: 'list_id', label: L('shList'), type: 'select', value: sortedLists()[0].id, options: listOptions(false) }]);
-        if (!af || !af.list_id) return;
-        return act(async function () { var r = await sb.from(T('wishes')).update({ list_id: af.list_id }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; }, L('saved'));
       }
       case 'list-new': {
         var lf = await askForm(L('shNewList'), [
