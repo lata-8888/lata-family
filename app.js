@@ -1158,18 +1158,18 @@
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, group: true }
     ];
     // Änderungen optional auch für die folgenden Termine einer Serie übernehmen
-    if (ev && ev.series_id && S.events.filter(function (x) { return x.series_id === ev.series_id; }).length > 1) fields.push({ name: 'follow', label: L('evFollow'), type: 'checkbox', value: true });
+    if (ev && ev.series_id && S.events.filter(function (x) { return x.series_id === ev.series_id; }).length > 1) fields.push({ name: 'follow', label: L('evFollow'), type: 'checkbox', value: true, group: true });
     // Bestehende Serie: Wiederholungsregel als Information anzeigen
     if (ev && ev.series_id) {
       var cnt = S.events.filter(function (x) { return x.series_id === ev.series_id; }).length, r0 = ev.series_rule;
       var unitKey = r0 ? { day: 'evUnitDay', week: 'evUnitWeek', month: 'evUnitMonth', year: 'evUnitYear' }[r0.unit] : '';
       var dayTxt = r0 && r0.unit === 'week' ? ', ' + new Date(2024, 0, (r0.wd && r0.wd.length ? r0.wd[0] : ((new Date(r0.start + 'T12:00:00').getDay() + 6) % 7) + 1)).toLocaleDateString(LOCALE[lang], { weekday: 'long' }) : '';
-      fields.push({ type: 'note', text: r0 && unitKey
+      fields.push({ type: 'note', group: true, text: r0 && unitKey
         ? L('evSeriesInfo', { n: r0.every, unit: L(unitKey), day: dayTxt, count: cnt }) + (ev.series_open ? ' · ' + L('evSeriesOpen') : '')
         : L('evSeriesPlain', { count: cnt }) });
     }
-    // Wiederholung nur beim Anlegen eines neuen Events
-    if (!ev) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false }); fields.push({ name: 'rec', type: 'recurrence' }); }
+    // Wiederholung beim Anlegen oder bei einem Einzeltermin (Serie beginnt dann mit diesem Termin)
+    if (!(ev && ev.series_id)) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false, group: true }); fields.push({ name: 'rec', type: 'recurrence', group: true }); }
     var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null);
     if (!f) return;
     if (f.__extra) return deleteEvent(ev);
@@ -1191,16 +1191,18 @@
       var ar = []; ids.forEach(function (id) { users.forEach(function (u) { ar.push({ event_id: id, user_id: u }); }); });
       if (ar.length) { var i2 = await sb.from(T('event_assignees')).insert(ar); if (i2.error) throw i2.error; }
     };
-    if (!ev && f.repeat) {
+    if (f.repeat && !(ev && ev.series_id)) {
       // keine Einschränkungen: Serie läuft unbegrenzt; angelegt werden die nächsten Termine ab heute bis ein Jahr voraus
       var rule = { start: f.date, time: tm, every: Math.max(1, f.every || 1), unit: f.unit, wd: f.wd || [] };
       var occ = genOccurrences(rule.start, rule.time, rule.every, rule.unit, rule.wd, oneYear(), today());
+      if (ev) occ = occ.filter(function (iso) { return new Date(iso) > new Date(row.starts_at); });   // der bearbeitete Termin ist der erste der Serie
       if (!occ.length) return toast(L('evNoOcc'));
       var sid = newSeriesId();
       var rows = occ.map(function (iso) { return { title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: iso, ends_at: shiftEnd(row.starts_at, row.ends_at, iso), end_time_set: row.end_time_set, category: row.category, series_id: sid, series_open: true, series_rule: rule }; });
       return act(async function () {
+        if (ev) { var u0 = await sb.from(T('events')).update(Object.assign({}, row, { series_id: sid, series_open: true, series_rule: rule })).eq('id', ev.id); if (u0.error) throw u0.error; }
         var r = await sb.from(T('events')).insert(rows).select('id'); if (r.error) throw r.error;
-        await setAssignees(r.data.map(function (x) { return x.id; }));
+        await setAssignees((ev ? [ev.id] : []).concat(r.data.map(function (x) { return x.id; })));
       }, L('evSeriesAdded', { n: rows.length }));
     }
     return act(async function () {
