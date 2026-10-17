@@ -418,7 +418,7 @@ begin
     insert into public."lata-products" (name, created_by) values (nm, me) on conflict (lower(btrim(name))) do nothing returning id into pid;
     if pid is null then select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm); end if;
   end if;
-  users := case when coalesce(array_length(p_users, 1), 0) = 0 then array[me] else p_users end;
+  users := case when p_users is null then array[me] else p_users end;   -- NULL = ich; leeres Array = nur das Produkt anlegen, kein Favorit
   foreach u in array users loop
     if not exists (select 1 from public."lata-profiles" where id = u) then raise exception 'Person nicht gefunden'; end if;
     insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected)

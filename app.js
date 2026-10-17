@@ -162,15 +162,20 @@
           if (f.type === 'checkbox') html = '<label class="check"><input type="checkbox" name="' + f.name + '"' + (f.value ? ' checked' : '') + '><span>' + esc(f.label) + '</span></label>';
           else if (f.type === 'recurrence') html = recurrenceBlock();
           else if (f.type === 'textarea') html = '<label class="fld"><span>' + esc(f.label) + '</span><textarea name="' + f.name + '" rows="3">' + esc(f.value || '') + '</textarea></label>';
-          else if (f.type === 'multi') html = '<div class="fld"><span>' + esc(f.label) + '</span><div class="chklist">' + f.options.map(function (o) {
-            return '<label class="check"><input type="checkbox" name="' + f.name + '" value="' + esc(o.v) + '"' + ((f.value || []).indexOf(o.v) > -1 ? ' checked' : '') + '><span>' + esc(o.l) + '</span></label>';
-          }).join('') + '</div></div>';
+          else if (f.type === 'multi') {
+            var boxes = '<div class="chklist">' + f.options.map(function (o) {
+              return '<label class="check"><input type="checkbox" name="' + f.name + '" value="' + esc(o.v) + '"' + ((f.value || []).indexOf(o.v) > -1 || o.lock ? ' checked' : '') + (o.lock ? ' disabled' : '') + '><span>' + esc(o.l) + '</span></label>';
+            }).join('') + '</div>';
+            // dropdown: Zeile «Label | Auswahl», die Auswahl klappt als Liste auf (0 bis n Einträge)
+            html = f.dropdown ? '<div class="fld inl"><span>' + esc(f.label) + '</span><details class="msel" data-for="' + f.name + '"><summary></summary>' + boxes + '</details></div>'
+              : '<div class="fld"><span>' + esc(f.label) + '</span>' + boxes + '</div>';
+          }
           else if (f.type === 'note') html = '<p class="muted small recinfo">' + esc(f.text) + '</p>';
           else if (f.type === 'phone') html = '<div class="fld"><span>' + esc(f.label) + '</span>' + phoneField(f.value) + '</div>';
-          else if (f.type === 'select') html = '<label class="fld"><span>' + esc(f.label) + '</span><select name="' + f.name + '">' + f.options.map(function (o) {
+          else if (f.type === 'select') html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><select name="' + f.name + '">' + f.options.map(function (o) {
             return '<option value="' + esc(o.v) + '"' + (o.v === f.value ? ' selected' : '') + '>' + esc(o.l) + '</option>';
           }).join('') + '</select></label>';
-          else html = '<label class="fld"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off">' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '') + '</label>';
+          else html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off"></label>' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '');
           // aufeinanderfolgende Felder mit half:true stehen nebeneinander (z. B. Datum | Zeit)
           var prev = fields[i - 1], next = fields[i + 1];
           if (f.half && !(prev && prev.half)) html = '<div class="grid2">' + html;
@@ -222,6 +227,16 @@
         inp.addEventListener('input', paint);
         box.addEventListener('click', function (e) { var b = e.target.closest('[data-sg]'); if (b) { inp.value = b.dataset.sg; paint(); inp.focus(); } });
         paint();
+      });
+      // Dropdown-Mehrfachauswahl: Kopfzeile zeigt die gewählten Namen
+      fields.forEach(function (f) {
+        if (f.type !== 'multi' || !f.dropdown) return;
+        var det = form.querySelector('details.msel[data-for="' + f.name + '"]'), sum = det.querySelector('summary');
+        var paintSel = function () {
+          var names = Array.prototype.map.call(det.querySelectorAll('input:checked'), function (i) { return i.parentNode.querySelector('span').textContent; });
+          sum.textContent = names.length ? names.join(', ') : L('shNobody');
+        };
+        det.addEventListener('change', paintSel); paintSel();
       });
       var first = form.querySelector('input'); if (first) first.focus();
     });
@@ -658,22 +673,30 @@
     extra = extra || {};
     name = String(name || '').trim();
     if (!name) return toast(L('shMissing'));
-    var low = name.toLowerCase();
+    var low = name.toLowerCase(), users = extra.users || [];
     var prod = S.products.filter(function (p) { return p.name.trim().toLowerCase() === low; })[0];
-    if (prod && myWish(prod.id)) return toast(L('shAlready'));
+    // gibt es das Produkt schon und niemand Neues wird Favorit, ist nichts zu tun
+    if (prod && !users.some(function (u) { return !S.wishes.some(function (w) { return w.product_id === prod.id && w.user_id === u; }); })) return toast(L('shAlready'));
     return act(async function () {
-      var r = await sb.rpc(F('add_wish'), { p_name: name, p_note: extra.note || null, p_list: extra.list_id || null, p_users: [S.me.id] });
+      var r = await sb.rpc(F('add_wish'), { p_name: name, p_note: extra.note || null, p_list: extra.list_id || null, p_users: users });
       if (r.error) throw r.error;
     });
   }
   // Produkt bearbeiten: Name (wer es angelegt hat, und Admins), Notiz und Liste gehören zu meinem Favoriten
+  // «Favorit für»: andere Personen können hier dazukommen; wer das Produkt schon führt, kann nur selbst abwählen (Stern) – ausser mir
+  function favForField(p, users) {
+    var have = {}; if (p) wishersOf(p.id).forEach(function (w) { have[w.user_id] = true; });
+    return { name: 'users', label: L('shFavFor'), type: 'multi', dropdown: true, value: users,
+      options: memberOptions().map(function (o) { return { v: o.v, l: o.l, lock: !!have[o.v] && o.v !== S.me.id }; }) };
+  }
   function needEditForm(p) {
     var w = myWish(p.id), fields = [];
-    if (canRename(p)) fields.push({ name: 'name', label: L('shName'), value: p.name });
+    if (canRename(p)) fields.push({ name: 'name', label: L('shName'), value: p.name, inline: true });
     if (w) {
-      fields.push({ name: 'note', label: L('shNote'), value: w.note });
-      fields.push({ name: 'list_id', label: L('shList'), type: 'select', value: w.list_id || '', options: listOptions(true) });
+      fields.push({ name: 'note', label: L('shNote'), value: w.note, inline: true });
+      fields.push({ name: 'list_id', label: L('shList'), type: 'select', value: w.list_id || '', options: listOptions(true), inline: true });
     }
+    fields.push(favForField(p, w ? [S.me.id] : []));
     return askForm(L('shEditNeed'), fields);
   }
 
@@ -1090,12 +1113,13 @@
         // neues Produkt; die Vorschläge zeigen den ganzen Katalog, «in deinen Favoriten» = ich führe es bereits
         var known = S.products.slice().sort(byName).map(function (p) { return { n: p.name, on: !!myWish(p.id) }; });
         var nf = await askForm(L('shAdd'), [
-          { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList') },
-          { name: 'note', label: L('shNote') },
-          { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true) }
+          { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList'), inline: true },
+          { name: 'note', label: L('shNote'), inline: true },
+          { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true), inline: true },
+          favForField(null, [S.me.id])
         ]);
         if (!nf) return;
-        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id });
+        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users });
       }
       case 'need-menu': { var np = productById(id); if (np) needMenu({ p: np, w: myWish(np.id), ws: [] }, v); return; }
       case 'ev-view': S.evView = v; return render();
@@ -1145,7 +1169,14 @@
           var newName = String(nfe.name == null ? ne.name : nfe.name).trim();
           if (!newName) throw new Error(L('shMissing'));
           if (newName !== ne.name) { var rn = await sb.from(T('products')).update({ name: newName }).eq('id', id); if (rn.error) throw rn.error; }
-          if (myWish(id)) { var r = await sb.from(T('wishes')).update({ note: nfe.note || null, list_id: nfe.list_id || null }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; }
+          var had = {}; wishersOf(id).forEach(function (w) { had[w.user_id] = true; });
+          var sel = nfe.users || [], addU = sel.filter(function (u) { return !had[u]; });
+          if (addU.length) { var ra = await sb.rpc(F('add_wish'), { p_name: newName, p_note: null, p_list: null, p_users: addU }); if (ra.error) throw ra.error; }
+          if (had[S.me.id] && sel.indexOf(S.me.id) < 0) {   // mich abgewählt: mein Favorit entfällt
+            var rd = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (rd.error) throw rd.error;
+          } else if (had[S.me.id]) {
+            var r = await sb.from(T('wishes')).update({ note: nfe.note || null, list_id: nfe.list_id || null }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error;
+          }
         }, L('saved'));
       }
       case 'prod-assign': {
@@ -1154,7 +1185,7 @@
         var have = {}; wishersOf(id).forEach(function (w) { have[w.user_id] = true; });
         var opts = memberOptions().filter(function (o) { return !have[o.v]; });
         if (!opts.length) return toast(L('shFavAll'));
-        var af2 = await askForm(L('shFavOf'), [{ name: 'users', label: L('shFavPeople'), type: 'multi', value: [], options: opts }]);
+        var af2 = await askForm(L('shFavOf'), [{ name: 'users', label: L('shFavFor'), type: 'multi', dropdown: true, value: [], options: opts }]);
         if (!af2 || !af2.users || !af2.users.length) return;
         return act(async function () { var r = await sb.rpc(F('add_wish'), { p_name: ap.name, p_note: null, p_list: null, p_users: af2.users }); if (r.error) throw r.error; }, L('saved'));
       }

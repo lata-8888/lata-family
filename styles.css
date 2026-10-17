@@ -30,6 +30,18 @@ p{margin:0}
 .fld{display:block;margin:0 0 16px}
 .fld>span{display:block;font-weight:600;margin-bottom:6px;font-size:.95rem}
 .fld input,.fld select{width:100%;padding:12px 14px;border-radius:var(--r-btn);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--font);font-size:1.05rem}
+.fld.inl{display:flex;align-items:center;gap:10px}
+.fld.inl>span{flex:0 0 6.5em;margin:0}
+.fld.inl>input,.fld.inl>select,.fld.inl>.msel{flex:1;min-width:0;width:auto}
+.fld.inl>.msel{width:100%}
+.fld.inl:has(.msel){align-items:flex-start}
+.fld.inl:has(.msel)>span{padding-top:13px}
+.fld + .suggbox{margin:-8px 0 16px}
+.msel>summary{list-style:none;cursor:pointer;display:block;padding:12px 38px 12px 14px;border-radius:var(--r-btn);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.msel>summary::-webkit-details-marker{display:none}
+.msel>summary::after{content:"";position:absolute;right:14px;top:50%;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg)}
+.msel[open]>summary{border-color:var(--crown)}
+.msel>.chklist{margin-top:6px}
 .check{display:flex;align-items:flex-start;gap:10px;margin:0 0 14px;font-size:.95rem;cursor:pointer}
 .check input{width:22px;height:22px;margin-top:1px;flex:0 0 auto;accent-color:var(--yes)}
 
