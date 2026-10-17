@@ -232,6 +232,13 @@
         box.addEventListener('click', function (e) { var b = e.target.closest('[data-sg]'); if (b) { inp.value = b.dataset.sg; paint(); inp.focus(); } });
         paint();
       });
+      // Checkbox mit hides: [...] blendet die genannten Felder aus (und leert sie), z. B. «Ganztägig» die Zeitfelder
+      fields.forEach(function (f) {
+        if (f.type !== 'checkbox' || !f.hides) return;
+        var cb = form.elements[f.name];
+        var apply = function () { f.hides.forEach(function (n) { var el = form.elements[n], box = el && el.closest('.fld'); if (box) { box.hidden = cb.checked; if (cb.checked) el.value = ''; } }); };
+        cb.addEventListener('change', apply); apply();
+      });
       // Dropdown-Mehrfachauswahl: Kopfzeile zeigt die gewählten Namen
       fields.forEach(function (f) {
         if (f.type !== 'multi' || !f.dropdown) return;
@@ -1133,6 +1140,7 @@
     var endLocal = ev && ev.ends_at ? toLocalInput(ev.ends_at).split('T') : ['', ''];
     var fields = [
       { name: 'title', label: L('evTitle'), value: ev && ev.title, inline: true },
+      { name: 'allday', label: L('evAllDay'), type: 'checkbox', value: !!ev && ev.time_set === false, hides: ['time', 'end_time'] },
       { name: 'date', label: L('evDate'), type: 'date', value: local[0], half: true },
       { name: 'time', label: L('evTime'), type: 'time', value: ev && ev.time_set === false ? '' : local[1], half: true },   // ganztägig: keine Zeit vorbelegen
       { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], half: true },
@@ -1160,6 +1168,7 @@
     if (!f) return;
     if (f.__extra) return deleteEvent(ev);
     if (!f.title || !f.date) return toast(L('evMissing'));
+    if (f.allday) { f.time = ''; f.end_time = ''; }   // ganztägig: ohne Start- und Endzeit
     var hasTime = !!f.time, tm = f.time || '00:00';
     // Ende: leer = gleicher Tag. Nur Enddatum = mehrtägig; Endzeit braucht eine Startzeit.
     if (f.end_time && !hasTime) return toast(L('evEndNeedsStart'));
