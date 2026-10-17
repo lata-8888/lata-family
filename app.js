@@ -402,7 +402,7 @@
     var btn = function (v, cls, label) { return '<button type="button" class="resp ' + cls + '" data-act="answer" data-id="' + e.id + '" data-val="' + v + '" aria-pressed="' + !!(mine && mine.answer === v) + '">' + esc(label) + '</button>'; };
     var info = !!S.open['evc:' + e.id];
     var asg = S.assign.filter(function (x) { return x.event_id === e.id; });   // Zeit und Ort: standardmässig eingeklappt
-    var infoHtml = info ? '<div class="evline"><span class="muted small">' + esc(e.time_set === false ? L('evNoTime') : fmtTime(e.starts_at)) + (e.place ? ' · ' + esc(e.place) : '') + '</span>' +
+    var infoHtml = info ? '<div class="evline"><span class="muted small">' + esc(evTimeText(e)) + (e.place ? ' · ' + esc(e.place) : '') + '</span>' +
       (asg.length ? '<span class="chips">' + pills(asg) + '</span>' : '') + '</div>' +
       (e.comment ? '<p class="evcomment">' + esc(e.comment) + '</p>' : '') : '';    // Antwort-Knöpfe nur, wenn für das Event eine Teilnahme nötig ist (rsvp)
     var rsvpHtml = e.rsvp === false ? '' :
@@ -410,13 +410,43 @@
       '<button type="button" class="resp cntbtn' + (open ? ' is-open' : '') + '" data-act="who" data-id="' + e.id + '" aria-expanded="' + open + '"><b>' + yes.length + '</b>' + ICON.chev + '</button></div>' +
       (open ? '<div class="who"><div><h4>' + esc(L('evParticipants', { n: yes.length })) + '</h4><div class="chips">' + pills(yes) + '</div></div>' +
         '<div><h4>' + esc(L('evDeclined', { n: no.length })) + '</h4><div class="chips">' + pills(no) + '</div></div></div>' : '');
-    return '<article class="ccel"><div class="cceh"><b>' + esc(fmtDay(e.starts_at)) + ' – ' + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
+    return '<article class="ccel"><div class="cceh"><b>' + esc(evDayText(e)) + ' – ' + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
       '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button>' +
       '<button type="button" class="accfold' + (info ? ' open' : '') + '" data-act="ev-card" data-id="' + e.id + '" aria-expanded="' + info + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' +
       (infoHtml || rsvpHtml ? '<div class="ccbody">' + infoHtml + rsvpHtml + '</div>' : '') + '</article>';
   }
   function fmtDay(iso) { return new Date(iso).toLocaleDateString(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
+  function fmtDayShort(iso) { return new Date(iso).toLocaleDateString(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short' }); }
+  // Zeitraum eines Events: ends_at ist optional (Datum, Endzeit nur wenn end_time_set); ohne Ende gilt der Starttag
+  function evLastDay(e) { return isoDate(new Date(e.ends_at || e.starts_at)); }
+  function evMultiDay(e) { return evLastDay(e) !== isoDate(new Date(e.starts_at)); }
+  function evDays(e) {   // alle Tage (YYYY-MM-DD), an denen das Event stattfindet
+    var out = [], d = new Date(e.starts_at), end = new Date(e.ends_at || e.starts_at);
+    d = new Date(d.getFullYear(), d.getMonth(), d.getDate()); end = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    for (var n = 0; d <= end && n < 400; n++) { out.push(isoDate(d)); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1); }
+    return out;
+  }
+  function evEndMs(e) {   // bis wann das Event «noch aktuell» ist
+    var s = new Date(e.starts_at).getTime();
+    if (!e.ends_at) return s + (e.time_set === false ? 86400000 : 0);
+    var en = new Date(e.ends_at);
+    return e.end_time_set ? en.getTime() : new Date(en.getFullYear(), en.getMonth(), en.getDate() + 1).getTime();
+  }
+  function evDayText(e) { return evMultiDay(e) ? fmtDayShort(e.starts_at) + ' – ' + fmtDay(e.ends_at) : fmtDay(e.starts_at); }
+  function evTimeText(e) {
+    if (e.time_set === false) return L('evNoTime');
+    var st = fmtTime(e.starts_at), multi = evMultiDay(e);
+    if (!e.ends_at || !e.end_time_set) return multi ? L('evFromTime', { t: st }) : st;
+    return multi ? L('evFromTime', { t: st }) + ' · ' + L('evUntilTime', { t: fmtTime(e.ends_at) }) : st + ' – ' + fmtTime(e.ends_at);
+  }
+  // Ende für einen anderen Starttermin (Serien): gleiche Anzahl Tage und gleiche Endzeit wie die Vorlage
+  function shiftEnd(refStartIso, refEndIso, newStartIso) {
+    if (!refEndIso) return null;
+    var rs = new Date(refStartIso), re = new Date(refEndIso), ns = new Date(newStartIso);
+    var span = Math.round((new Date(re.getFullYear(), re.getMonth(), re.getDate()) - new Date(rs.getFullYear(), rs.getMonth(), rs.getDate())) / 86400000);
+    return new Date(ns.getFullYear(), ns.getMonth(), ns.getDate() + span, re.getHours(), re.getMinutes()).toISOString();
+  }
   function fmtTime(iso) { return new Date(iso).toLocaleTimeString(LOCALE[lang], { hour: '2-digit', minute: '2-digit' }); }
   // Zeithorizont in Monaten (persönlich, nur auf diesem Gerät gespeichert); 0 = alle Events zeigen
   function evHorizon() {
@@ -458,10 +488,52 @@
     return '<button type="button" class="' + cls + '" data-act="cal-day" data-val="' + key + '" aria-pressed="' + (key === sel) + '"><span class="dn">' + dn + '</span>' + ICON.cal +
       (evs.length > 1 ? '<span class="cn">' + evs.length + '</span>' : '') + (fav ? '<span class="cfav" aria-hidden="true">' + ICON.star + '</span>' : '') + '</button>';
   }
+  // Wochenansicht als Stundenplan: Tage als Spalten, Stunden als Zeilen; ganztägige und mehrtägige Events im Band darüber
+  function weekTimetable(from, byDay, sel, todayKey) {
+    var HP = 30, days = [], segs = {}, allday = {}, minH = 8, maxH = 18;
+    for (var c = 0; c < 7; c++) {
+      var d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + c), k = isoDate(d);
+      var ds = d.getTime(), de = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+      days.push({ d: d, k: k }); segs[k] = []; allday[k] = [];
+      (byDay[k] || []).forEach(function (e) {
+        if (e.time_set === false) { allday[k].push(e); return; }
+        var st = new Date(e.starts_at).getTime(), en = e.ends_at ? evEndMs(e) : st + 3600000;   // ohne Ende: eine Stunde
+        var s0 = Math.max(st, ds), e0 = Math.min(en, de);
+        var sm = Math.round((s0 - ds) / 60000), em = Math.min(1440, Math.max(Math.round((e0 - ds) / 60000), sm + 30));
+        segs[k].push({ e: e, s: sm, en: em });
+        minH = Math.min(minH, Math.floor(sm / 60)); maxH = Math.max(maxH, Math.ceil(em / 60));
+      });
+    }
+    days.forEach(function (dy) {   // überlappende Termine nebeneinander
+      var list = segs[dy.k].sort(function (x, y) { return x.s - y.s || x.en - y.en; }), laneEnd = [];
+      list.forEach(function (sg) { var l = 0; while (laneEnd[l] > sg.s) l++; laneEnd[l] = sg.en; sg.lane = l; });
+      dy.lanes = Math.max(1, laneEnd.length);
+    });
+    var wd = function (d) { return d.toLocaleDateString(LOCALE[lang], { weekday: 'short' }); };
+    var html = '<div class="tt"><div class="ttrow"><span></span>' + days.map(function (dy) {
+      return '<button type="button" class="ttd' + (dy.k === todayKey ? ' today' : '') + (dy.k === sel ? ' sel' : '') + '" data-act="cal-day" data-val="' + dy.k + '"><span>' + esc(wd(dy.d)) + '</span><b>' + dy.d.getDate() + '</b></button>';
+    }).join('') + '</div>';
+    var anyAll = days.some(function (dy) { return allday[dy.k].length; });
+    if (anyAll) html += '<div class="ttrow ttad"><span title="' + esc(L('evNoTime')) + '">&#9788;</span>' + days.map(function (dy) {
+      var l = allday[dy.k];
+      return '<div class="ttc">' + l.slice(0, 3).map(function (e) { return '<button type="button" class="ttchip' + (isFavEvent(e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '" title="' + esc(e.title) + '">' + esc(e.title) + '</button>'; }).join('') + (l.length > 3 ? '<i>+' + (l.length - 3) + '</i>' : '') + '</div>';
+    }).join('') + '</div>';
+    var hours = ''; for (var h = minH; h < maxH; h++) hours += '<b style="top:' + (h - minH) * HP + 'px">' + String(h).padStart(2, '0') + '</b>';
+    var now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
+    html += '<div class="ttbody" style="height:' + (maxH - minH) * HP + 'px;--hp:' + HP + 'px"><div class="tth">' + hours + '</div>' + days.map(function (dy) {
+      var blocks = segs[dy.k].map(function (sg) {
+        var top = (sg.s - minH * 60) / 60 * HP, hgt = Math.max(14, (sg.en - sg.s) / 60 * HP - 1), w = 100 / dy.lanes;
+        return '<button type="button" class="ttb' + (isFavEvent(sg.e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '" style="top:' + top + 'px;height:' + hgt + 'px;left:' + sg.lane * w + '%;width:calc(' + w + '% - 1px)" title="' + esc(sg.e.title) + '">' + esc(sg.e.title) + '</button>';
+      }).join('');
+      var nowLine = dy.k === todayKey && nowMin >= minH * 60 && nowMin <= maxH * 60 ? '<div class="ttnow" style="top:' + (nowMin - minH * 60) / 60 * HP + 'px"></div>' : '';
+      return '<div class="ttcol' + (dy.k === sel ? ' sel' : '') + '">' + blocks + nowLine + '</div>';
+    }).join('') + '</div></div>';
+    return html;
+  }
   function viewCalendar(mode) {
     var now = new Date(), todayKey = isoDate(now), week = mode === 'week';
     var byDay = {};
-    agendaEvents().forEach(function (e) { var k = isoDate(new Date(e.starts_at)); (byDay[k] = byDay[k] || []).push(e); });
+    agendaEvents().forEach(function (e) { evDays(e).forEach(function (k) { (byDay[k] = byDay[k] || []).push(e); }); });   // mehrtägige Events an jedem Tag
     var from, to, label, canNext, cells = '';
     var lastOk = new Date(now.getFullYear(), now.getMonth() + 12, 1);
     if (week) {
@@ -480,10 +552,10 @@
     var html = '<div class="calnav"><button type="button" class="hico" data-act="cal-prev" aria-label="' + esc(L(week ? 'evPrevWeek' : 'evPrevMonth')) + '">' + ICON.chev + '</button>' +
       '<b>' + esc(label) + '</b>' +
       '<button type="button" class="hico" data-act="cal-next" aria-label="' + esc(L(week ? 'evNextWeek' : 'evNextMonth')) + '"' + (canNext ? '' : ' disabled') + '>' + ICON.chev + '</button></div>';
-    html += '<div class="calgrid calwd">' + [1, 2, 3, 4, 5, 6, 7].map(function (d) { return '<span>' + esc(new Date(2024, 0, d).toLocaleDateString(LOCALE[lang], { weekday: 'short' })) + '</span>'; }).join('') + '</div>';
     if (week) {
-      for (var c = 0; c < 7; c++) { var d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + c), k = isoDate(d); cells += calCell(k, d.getDate(), byDay[k] || [], sel, todayKey); }
+      html += weekTimetable(from, byDay, sel, todayKey);
     } else {
+      html += '<div class="calgrid calwd">' + [1, 2, 3, 4, 5, 6, 7].map(function (d) { return '<span>' + esc(new Date(2024, 0, d).toLocaleDateString(LOCALE[lang], { weekday: 'short' })) + '</span>'; }).join('') + '</div>';
       var y = from.getFullYear(), m = from.getMonth(), lead = (from.getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate(), weeks = Math.ceil((lead + dim) / 7);
       for (var c2 = 0; c2 < weeks * 7; c2++) {
         var dn = c2 - lead + 1;
@@ -491,10 +563,10 @@
         var key = isoDate(new Date(y, m, dn)); cells += calCell(key, dn, byDay[key] || [], sel, todayKey);
       }
     }
-    html += '<div class="calgrid">' + cells + '</div>';
+    if (!week) html += '<div class="calgrid">' + cells + '</div>';
     // Liste darunter: Termine des Zeitraums, oder nur des gewählten Tages
     var f = sel || isoDate(from), t = sel ? null : isoDate(to);
-    var list = agendaEvents().filter(function (e) { var k = isoDate(new Date(e.starts_at)); return sel ? k === sel : (k >= f && k < t); }).sort(function (x, y) { return new Date(x.starts_at) - new Date(y.starts_at); });
+    var list = agendaEvents().filter(function (e) { var ds = evDays(e); return sel ? ds.indexOf(sel) > -1 : ds.some(function (k) { return k >= f && k < t; }); }).sort(function (x, y) { return new Date(x.starts_at) - new Date(y.starts_at); });
     html += '<p class="muted small calhint">' + esc(L('evCalHint')) + '</p>';
     html += list.length ? '<div class="calsel">' + list.map(eventCard).join('') + '</div>' : '<div class="empty"><p>' + esc(L('evNoneInPeriod')) + '</p></div>';
     return html;
@@ -503,9 +575,9 @@
     var limit = Date.now() - 3 * 3600e3;
     var yc = new Date(); yc.setFullYear(yc.getFullYear() + 1); var yearCut = yc.getTime();   // Agenda zeigt höchstens ein Jahr voraus
     var evs0 = agendaEvents();
-    var up = evs0.filter(function (e) { var t = new Date(e.starts_at).getTime(); if (e.time_set === false) t += 86400000;   // ohne Uhrzeit: bis Tagesende aktuell
-      return t >= limit && t < yearCut; });
-    var past = evs0.filter(function (e) { return new Date(e.starts_at).getTime() + (e.time_set === false ? 86400000 : 0) < limit; }).reverse();
+    // aktuell bis zum Ende (mehrtägige Events bis zum letzten Tag; ohne Uhrzeit bis Tagesende)
+    var up = evs0.filter(function (e) { return evEndMs(e) >= limit && new Date(e.starts_at).getTime() < yearCut; });
+    var past = evs0.filter(function (e) { return evEndMs(e) < limit; }).reverse();
     var hz = evHorizon(), cut = null;
     if (hz > 0) { var c = new Date(); c.setMonth(c.getMonth() + hz); cut = c.getTime(); }
     var near = cut === null ? up : up.filter(function (e) { return new Date(e.starts_at).getTime() < cut; });
@@ -572,7 +644,7 @@
     var list = function (a) { return a.length ? '<ul class="list">' + a.map(taskRow).join('') + '</ul>' : '<p class="muted">' + esc(L('taskEmpty')) + '</p>'; };
     // wie im Einkauf: oben meine Favoriten, darunter alle weiteren Aufgaben; «+» legt eine neue Aufgabe an
     return '<div class="top"><div><h1 class="pagetitle">' + esc(L('navTasks')) + '</h1></div></div>' +
-      accordion('task-favs', L('shFavs'), open(favs), list(favs)) +
+      accordion('task-favs', L('taskMine'), open(favs), list(favs)) +
       accordion('task-more', L('taskMore'), open(more), list(more), 'task-new', L('taskNew'));
   }
   async function taskForm(t) {
@@ -802,7 +874,7 @@
     // Chronologisch: frühestes Event zuerst
     var evs = S.events.slice().sort(function (a, b) { return new Date(a.starts_at) - new Date(b.starts_at); });
     var evBody = evs.length ? '<ul class="list">' + evs.map(function (e) {
-      return '<li><div class="l"><b>' + esc(e.title) + (e.series_id ? ' <span class="small muted">&#8635;</span>' : '') + '</b><span>' + esc(e.time_set === false ? fmtDay(e.starts_at) : fmtDate(e.starts_at)) + (e.place ? ' · ' + esc(e.place) : '') + '</span></div>' +
+      return '<li><div class="l"><b>' + esc(e.title) + (e.series_id ? ' <span class="small muted">&#8635;</span>' : '') + '</b><span>' + esc(evDayText(e) + (e.time_set === false ? '' : ' · ' + evTimeText(e))) + (e.place ? ' · ' + esc(e.place) : '') + '</span></div>' +
         '<div class="btnrow"><button type="button" class="mini" data-act="ev-edit" data-id="' + e.id + '">' + esc(L('edit')) + '</button>' +
         '<button type="button" class="mini del" data-act="ev-del" data-id="' + e.id + '">' + esc(L('del')) + '</button></div></li>';
     }).join('') + '</ul>' : '<p class="muted">' + esc(L('evAdminEmpty')) + '</p>';
@@ -943,7 +1015,7 @@
       var sid = sids[si], list = bySid[sid].sort(function (x, y) { return new Date(x.starts_at) - new Date(y.starts_at); });
       var lastEv = list[list.length - 1], r = lastEv.series_rule, last = new Date(lastEv.starts_at).getTime(), rows = [];
       genOccurrences(r.start, r.time, r.every, r.unit, r.wd, oneYear(), today()).forEach(function (iso) {
-        if (new Date(iso).getTime() > last) rows.push({ title: lastEv.title, place: lastEv.place, comment: lastEv.comment || null, rsvp: lastEv.rsvp, time_set: lastEv.time_set, starts_at: iso, series_id: sid, series_open: true, series_rule: r });
+        if (new Date(iso).getTime() > last) rows.push({ title: lastEv.title, place: lastEv.place, comment: lastEv.comment || null, rsvp: lastEv.rsvp, time_set: lastEv.time_set, starts_at: iso, ends_at: shiftEnd(lastEv.starts_at, lastEv.ends_at, iso), end_time_set: !!lastEv.end_time_set, series_id: sid, series_open: true, series_rule: r });
       });
       if (!rows.length) continue;
       var res = await sb.from(T('events')).insert(rows).select('id');
@@ -1046,10 +1118,13 @@
     if (ev && !canManageEvents()) return eventFavForm(ev, haveEv);
     // Wie in der FBRO-App: Titel, Datum und Uhrzeit getrennt (Datum | Zeit nebeneinander), Ort; Labels links
     var local = ev ? toLocalInput(ev.starts_at).split('T') : ['', ''];
+    var endLocal = ev && ev.ends_at ? toLocalInput(ev.ends_at).split('T') : ['', ''];
     var fields = [
       { name: 'title', label: L('evTitle'), value: ev && ev.title, inline: true },
       { name: 'date', label: L('evDate'), type: 'date', value: local[0], half: true },
-      { name: 'time', label: L('evTime'), type: 'time', value: local[1], half: true },
+      { name: 'time', label: L('evTime'), type: 'time', value: ev && ev.time_set === false ? '' : local[1], half: true },   // ganztägig: keine Zeit vorbelegen
+      { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], half: true },
+      { name: 'end_time', label: L('evEndTime'), type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', half: true },
       { name: 'place', label: L('evPlace'), value: ev && ev.place, inline: true },
       { name: 'comment', label: L('evComment'), type: 'textarea', value: ev && ev.comment, inline: true },
       favPeopleField(haveEv, true),
@@ -1073,7 +1148,13 @@
     if (f.__extra) return deleteEvent(ev);
     if (!f.title || !f.date) return toast(L('evMissing'));
     var hasTime = !!f.time, tm = f.time || '00:00';
-    var row = { title: f.title, place: f.place || null, comment: f.comment || null, starts_at: new Date(f.date + 'T' + tm).toISOString(), rsvp: !!f.rsvp, time_set: hasTime };
+    // Ende: leer = gleicher Tag. Nur Enddatum = mehrtägig; Endzeit braucht eine Startzeit.
+    if (f.end_time && !hasTime) return toast(L('evEndNeedsStart'));
+    var endDate = f.end_date || (f.end_time ? f.date : '');
+    if (endDate && (endDate < f.date || (endDate === f.date && f.end_time && f.end_time < tm))) return toast(L('evEndBefore'));
+    if (endDate === f.date && !f.end_time) endDate = '';
+    var endsIso = endDate ? new Date(endDate + 'T' + (f.end_time || '00:00')).toISOString() : null;
+    var row = { title: f.title, place: f.place || null, comment: f.comment || null, starts_at: new Date(f.date + 'T' + tm).toISOString(), ends_at: endsIso, end_time_set: !!(endsIso && f.end_time), rsvp: !!f.rsvp, time_set: hasTime };
     var users = f.users || [];
     // ersetzt die Zuteilung der angegebenen Events durch die gewählten Personen
     var setAssignees = async function (ids) {
@@ -1088,7 +1169,7 @@
       var occ = genOccurrences(rule.start, rule.time, rule.every, rule.unit, rule.wd, oneYear(), today());
       if (!occ.length) return toast(L('evNoOcc'));
       var sid = newSeriesId();
-      var rows = occ.map(function (iso) { return { title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: iso, series_id: sid, series_open: true, series_rule: rule }; });
+      var rows = occ.map(function (iso) { return { title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: iso, ends_at: shiftEnd(row.starts_at, row.ends_at, iso), end_time_set: row.end_time_set, series_id: sid, series_open: true, series_rule: rule }; });
       return act(async function () {
         var r = await sb.from(T('events')).insert(rows).select('id'); if (r.error) throw r.error;
         await setAssignees(r.data.map(function (x) { return x.id; }));
@@ -1104,7 +1185,8 @@
           var fol = S.events.filter(function (x) { return x.series_id === ev.series_id && x.id !== ev.id && new Date(x.starts_at) > new Date(ev.starts_at); });
           var ups = await Promise.all(fol.map(function (x) {
             var nd = new Date(x.starts_at); nd.setDate(nd.getDate() + dayDelta);
-            return sb.from(T('events')).update({ title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: new Date(isoDate(nd) + 'T' + tm).toISOString() }).eq('id', x.id);
+            var nsIso = new Date(isoDate(nd) + 'T' + tm).toISOString();
+            return sb.from(T('events')).update({ title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: nsIso, ends_at: shiftEnd(row.starts_at, row.ends_at, nsIso), end_time_set: row.end_time_set }).eq('id', x.id);
           }));
           ups.forEach(function (u) { if (u.error) throw u.error; });
           ids = ids.concat(fol.map(function (x) { return x.id; }));

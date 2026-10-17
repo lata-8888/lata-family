@@ -30,6 +30,8 @@ create table if not exists public."lata-events" (
   title text not null check (char_length(title) between 1 and 120),
   place text,
   starts_at timestamptz not null,
+  ends_at timestamptz,                         -- optionales Ende (Datum; Endzeit nur wenn end_time_set)
+  end_time_set boolean not null default false,
   created_at timestamptz not null default now(),
   rsvp boolean not null default false,
   series_id uuid,
@@ -38,6 +40,13 @@ create table if not exists public."lata-events" (
   series_rule jsonb,
   comment text
 );
+alter table public."lata-events" add column if not exists ends_at timestamptz;
+alter table public."lata-events" add column if not exists end_time_set boolean not null default false;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'lata-events_ends_after_start') then
+    alter table public."lata-events" add constraint "lata-events_ends_after_start" check (ends_at is null or ends_at >= starts_at);
+  end if;
+end $$;
 create index if not exists "lata-events_series_idx" on public."lata-events" (series_id);
 
 create table if not exists public."lata-event_assignees" (
