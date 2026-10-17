@@ -715,9 +715,30 @@
   function byName(a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); }
   function byItem(a, b) { return byName(a.p, b.p); }
   function sortedLists() { return S.lists.slice().sort(byName); }   // Listen immer alphabetisch
-  function listOptions(withNone) {
-    var o = withNone ? [{ v: '', l: L('shNoList') }] : [];
-    return o.concat(sortedLists().map(function (l) { return { v: l.id, l: l.name + (l.is_private ? ' (' + L('shPrivTag').toLowerCase() + ')' : '') }; }));
+  // «Einkaufslisten» als farbige Kacheln (eine Auswahl): Leer | Listen … | + Neue Liste (führt in den Dialog)
+  function listField(value) {
+    var opts = [{ v: '', c: 'var(--muted)', l: L('shListNone') }];
+    sortedLists().forEach(function (l, k) { opts.push({ v: l.id, c: PCOLORS[k % PCOLORS.length], l: l.name + (l.is_private ? ' (' + L('shPrivTag').toLowerCase() + ')' : '') }); });
+    opts.push({ v: '__new', c: 'var(--ink)', l: '+ ' + L('shNewList') });
+    return { name: 'list_id', label: L('shList'), type: 'cat', value: value || '', options: opts };
+  }
+  // neue Liste anlegen (Dialog); liefert die ID oder null
+  async function newListDialog() {
+    var lf = await askForm(L('shNewList'), [
+      { name: 'name', label: L('shListName') },
+      { name: 'is_private', label: L('shPrivate'), type: 'checkbox', value: false }
+    ]);
+    if (!lf || !lf.name) return null;
+    var r = await sb.from(T('shop_lists')).insert({ name: lf.name, owner_id: S.me.id, is_private: !!lf.is_private }).select('id').single();
+    if (r.error) { console.error(r.error); toast(errText(r.error)); return null; }
+    return r.data.id;
+  }
+  // Auswahl «+ Neue Liste» in eine echte Listen-ID umwandeln; false = abgebrochen
+  async function resolveListChoice(f) {
+    if (f.list_id !== '__new') return true;
+    var id = await newListDialog();
+    if (!id) return false;
+    f.list_id = id; return true;
   }
   function lockIcon(l) { return l && l.is_private ? '<span class="lock" title="' + esc(L('shPrivTag')) + '">' + ICON.lock + '</span>' : ''; }
   function productById(id) { return S.products.filter(function (x) { return x.id === id; })[0] || null; }
@@ -825,14 +846,16 @@
     return { name: 'users', label: L('shFavFor'), type: 'multi', chips: true, value: users,
       options: memberOptions().map(function (o) { return { v: o.v, l: o.l, lock: !!have[o.v] && o.v !== S.me.id }; }) };
   }
-  function needEditForm(p) {
+  async function needEditForm(p) {
     var w = myWish(p.id), fields = [];
     if (canRename(p)) fields.push({ name: 'name', label: L('shName'), value: p.name, inline: true });
     // Notiz und Liste gehören zum Favoriten; ist das Produkt noch kein Favorit, gelten sie für die neu gewählten Personen
     fields.push({ name: 'note', label: L('shNote'), value: w ? w.note : '', inline: true });
-    fields.push({ name: 'list_id', label: L('shList'), type: 'select', value: (w && w.list_id) || '', options: listOptions(true), inline: true });
+    fields.push(listField(w && w.list_id));
     fields.push(favForField(p, w ? [S.me.id] : []));
-    return askForm(L('shEditNeed'), fields, null, null, canRename(p) ? L('shProdDel') : null);   // «Produkt löschen» unten im Dialog
+    var fr = await askForm(L('shEditNeed'), fields, null, null, canRename(p) ? L('shProdDel') : null);   // «Produkt löschen» unten im Dialog
+    if (!fr || fr.__extra) return fr;
+    return (await resolveListChoice(fr)) ? fr : null;
   }
 
   function viewProfile() {
@@ -1283,10 +1306,10 @@
         var nf = await askForm(L('shAdd'), [
           { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList'), inline: true },
           { name: 'note', label: L('shNote'), inline: true },
-          { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true), inline: true },
+          listField(''),
           favForField(null, [S.me.id])
         ]);
-        if (!nf) return;
+        if (!nf || !(await resolveListChoice(nf))) return;
         return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users });
       }
       case 'ev-view': S.evView = v; return render();
@@ -1361,17 +1384,7 @@
           }
         }, L('saved'));
       }
-      case 'list-new': {
-        var lf = await askForm(L('shNewList'), [
-          { name: 'name', label: L('shListName') },
-          { name: 'is_private', label: L('shPrivate'), type: 'checkbox', value: false }
-        ]);
-        if (!lf || !lf.name) return;
-        return act(async function () {
-          var r = await sb.from(T('shop_lists')).insert({ name: lf.name, owner_id: S.me.id, is_private: !!lf.is_private });
-          if (r.error) throw r.error;
-        }, L('saved'));
-      }
+      case 'list-new': { if (await newListDialog()) { await loadAll(); render(); toast(L('saved')); } return; }
       case 'list-rename': {
         var rl = listById(id); if (!rl) return;
         var rn = await askForm(L('shRename'), [{ name: 'name', label: L('shListName'), value: rl.name }]);
