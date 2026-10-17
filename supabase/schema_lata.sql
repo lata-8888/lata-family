@@ -471,6 +471,7 @@ create policy events_manage on public."lata-events" for all to authenticated usi
 create policy event_assignees_select on public."lata-event_assignees" for select to authenticated using (public.lata_is_user());
 create policy event_assignees_manage on public."lata-event_assignees" for all to authenticated using (public.lata_can_manage_events()) with check (public.lata_can_manage_events());
 -- Favorit eines Events: jede Person setzt und entfernt ihren eigenen Eintrag (Stern in der Agenda)
+create policy event_assignees_add_any on public."lata-event_assignees" for insert to authenticated with check (public.lata_is_user());   -- «Favorit für»: andere hinzufügen
 create policy event_assignees_own_write on public."lata-event_assignees" for all to authenticated
   using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
 create policy event_responses_select on public."lata-event_responses" for select to authenticated using (public.lata_is_user());
@@ -485,6 +486,7 @@ create policy tasks_update on public."lata-tasks" for update to authenticated
   with check (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()));
 create policy tasks_delete on public."lata-tasks" for delete to authenticated using (created_by = auth.uid() or public.lata_is_admin());
 create policy task_assignees_select on public."lata-task_assignees" for select to authenticated using (public.lata_is_user());
+create policy task_assignees_add_any on public."lata-task_assignees" for insert to authenticated with check (public.lata_is_user());   -- «Favorit für»: andere hinzufügen
 create policy task_assignees_own_write on public."lata-task_assignees" for all to authenticated   -- Stern: eigener Eintrag
   using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
 create policy task_assignees_manage on public."lata-task_assignees" for all to authenticated      -- «Favorit für»: Ersteller/in und Admins

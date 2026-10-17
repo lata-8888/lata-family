@@ -162,7 +162,7 @@
           var html;
           if (f.type === 'checkbox') html = '<label class="check"><input type="checkbox" name="' + f.name + '"' + (f.value ? ' checked' : '') + '><span>' + esc(f.label) + '</span></label>';
           else if (f.type === 'recurrence') html = recurrenceBlock();
-          else if (f.type === 'textarea') html = '<label class="fld"><span>' + esc(f.label) + '</span><textarea name="' + f.name + '" rows="3">' + esc(f.value || '') + '</textarea></label>';
+          else if (f.type === 'textarea') html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><textarea name="' + f.name + '" rows="' + (f.inline ? 2 : 3) + '">' + esc(f.value || '') + '</textarea></label>';
           else if (f.type === 'multi') {
             var boxes = '<div class="chklist">' + f.options.map(function (o) {
               return '<label class="check"><input type="checkbox" name="' + f.name + '" value="' + esc(o.v) + '"' + ((f.value || []).indexOf(o.v) > -1 || o.lock ? ' checked' : '') + (o.lock ? ' disabled' : '') + '><span>' + esc(o.l) + '</span></label>';
@@ -411,7 +411,7 @@
       (open ? '<div class="who"><div><h4>' + esc(L('evParticipants', { n: yes.length })) + '</h4><div class="chips">' + pills(yes) + '</div></div>' +
         '<div><h4>' + esc(L('evDeclined', { n: no.length })) + '</h4><div class="chips">' + pills(no) + '</div></div></div>' : '');
     return '<article class="ccel"><div class="cceh"><b>' + esc(fmtDay(e.starts_at)) + ' – ' + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
-      (canManageEvents() ? '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.dots + '</button>' : '') +
+      '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button>' +
       '<button type="button" class="accfold' + (info ? ' open' : '') + '" data-act="ev-card" data-id="' + e.id + '" aria-expanded="' + info + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' +
       (infoHtml || rsvpHtml ? '<div class="ccbody">' + infoHtml + rsvpHtml + '</div>' : '') + '</article>';
@@ -530,6 +530,13 @@
     return html;
   }
 
+  // «Favorit für» (Dropdown, 0–n Personen) für Events und Tasks: Verwalter (Ersteller/in, Admins, Event Manager) ändern alle;
+  // alle anderen können Personen hinzufügen und sich selbst abwählen – wer schon Favorit ist, bleibt gesperrt (ausser ich selbst)
+  function favPeopleField(have, canManage) {
+    return { name: 'users', label: L('shFavFor'), type: 'multi', dropdown: true,
+      value: canManage ? have : (have.indexOf(S.me.id) > -1 ? [S.me.id] : []),
+      options: memberOptions().map(function (o) { return { v: o.v, l: o.l, lock: !canManage && have.indexOf(o.v) > -1 && o.v !== S.me.id }; }) };
+  }
   /* ---------- Tasks: gemeinsame Aufgaben; Favorit = zugeteilte Person (lata-task_assignees); Termin optional ---------- */
   function today() { var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
   function fmtDue(d) { return new Date(d + 'T12:00:00').toLocaleDateString(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
@@ -555,7 +562,7 @@
       (t.due_date ? '<span class="' + (over ? 'tover' : '') + '">' + esc(L('taskDueOn', { date: fmtDue(t.due_date) })) + (over ? ' · ' + esc(L('taskOverdue')) : '') + '</span>' : '') +
       (t.note ? '<span class="tnote">' + esc(t.note) + '</span>' : '') + '</div>' +
       '<div class="btnrow">' +
-      (canEdit ? '<button type="button" class="hico" data-act="task-edit" data-id="' + t.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' : '') +
+      '<button type="button" class="hico" data-act="task-edit" data-id="' + t.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (fav ? ' on' : '') + '" data-act="task-fav" data-id="' + t.id + '" aria-pressed="' + fav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button></div></li>';
   }
   function viewTasks() {
@@ -569,24 +576,28 @@
       accordion('task-more', L('taskMore'), open(more), list(more), 'task-new', L('taskNew'));
   }
   async function taskForm(t) {
-    // «Favorit für»: eine oder mehrere Personen (0–n); der Termin ist optional
-    var f = await askForm(t ? L('taskEdit') : L('taskNew'), [
+    // Ersteller/in und Admins ändern die Aufgabe; alle anderen sehen nur «Favorit für» (Personen hinzufügen, sich selbst abwählen)
+    var manage = !t || canEditTask(t), have = t ? taskWho(t.id) : [S.me.id];
+    var fields = manage ? [
       { name: 'title', label: L('taskTitle'), value: t && t.title, inline: true },
       { name: 'due_date', label: L('taskDue'), type: 'date', value: t ? t.due_date : '', inline: true },
       { name: 'note', label: L('taskNote'), value: t && t.note, inline: true },
-      { name: 'users', label: L('shFavFor'), type: 'multi', dropdown: true, value: t ? taskWho(t.id) : [S.me.id], options: memberOptions() }
-    ], null, null, t ? L('del') : null);   // «Löschen» unten im Dialog
+      favPeopleField(have, true)
+    ] : [favPeopleField(have, false)];
+    var f = await askForm(t ? L('taskEdit') : L('taskNew'), fields, null, null, t && manage ? L('del') : null);   // «Löschen» unten im Dialog
     if (!f) return;
     if (f.__extra) {
       if (await askConfirm(L('del'), L('taskDeleteAsk', { title: t.title }), true))
         return act(async function () { var r = await sb.from(T('tasks')).delete().eq('id', t.id); if (r.error) throw r.error; }, L('removed'));
       return;
     }
-    if (!f.title) return toast(L('taskMissing'));
+    if (manage && !f.title) return toast(L('taskMissing'));
     return act(async function () {
       var row = { title: f.title, due_date: f.due_date || null, note: f.note || null }, id = t ? t.id : null;
-      if (t) { var ru = await sb.from(T('tasks')).update(row).eq('id', id); if (ru.error) throw ru.error; }
-      else { row.created_by = S.me.id; var ri = await sb.from(T('tasks')).insert(row).select('id'); if (ri.error) throw ri.error; id = ri.data[0].id; }
+      if (manage) {
+        if (t) { var ru = await sb.from(T('tasks')).update(row).eq('id', id); if (ru.error) throw ru.error; }
+        else { row.created_by = S.me.id; var ri = await sb.from(T('tasks')).insert(row).select('id'); if (ri.error) throw ri.error; id = ri.data[0].id; }
+      }
       var sel = f.users || [], had = t ? taskWho(id) : [];
       var add = sel.filter(function (u) { return had.indexOf(u) < 0; }), rem = had.filter(function (u) { return sel.indexOf(u) < 0; });
       if (add.length) { var ra = await sb.from(T('task_assignees')).insert(add.map(function (u) { return { task_id: id, user_id: u }; })); if (ra.error) throw ra.error; }
@@ -1011,17 +1022,37 @@
       var r = await q; if (r.error) throw r.error;
     }, L('removed'));
   }
+  // Personen ohne Verwalterrechte (kein Admin/Event Manager) sehen nur «Favorit für»: Personen hinzufügen, sich selbst abwählen (bei Serien ab diesem Termin)
+  async function eventFavForm(ev, have) {
+    var f = await askForm(L('evEdit'), [favPeopleField(have, false)]);
+    if (!f) return;
+    var sel = f.users || [], add = sel.filter(function (u) { return have.indexOf(u) < 0; });
+    var dropMe = have.indexOf(S.me.id) > -1 && sel.indexOf(S.me.id) < 0;
+    if (!add.length && !dropMe) return;
+    var t0 = new Date(ev.starts_at).getTime();
+    var ids = ev.series_id ? S.events.filter(function (x) { return x.series_id === ev.series_id && new Date(x.starts_at).getTime() >= t0; }).map(function (x) { return x.id; }) : [ev.id];
+    return act(async function () {
+      var rows = []; ids.forEach(function (id) { add.forEach(function (u) { rows.push({ event_id: id, user_id: u }); }); });
+      for (var i = 0; i < rows.length; i += 200) {
+        var r = await sb.from(T('event_assignees')).upsert(rows.slice(i, i + 200), { onConflict: 'event_id,user_id', ignoreDuplicates: true }); if (r.error) throw r.error;
+      }
+      for (var k = 0; k < ids.length && dropMe; k += 100) {
+        var rd = await sb.from(T('event_assignees')).delete().in('event_id', ids.slice(k, k + 100)).eq('user_id', S.me.id); if (rd.error) throw rd.error;
+      }
+    }, L('saved'));
+  }
   async function eventForm(ev) {
-    // Wie in der FBRO-App: Titel, Datum und Uhrzeit getrennt (Datum | Zeit nebeneinander), Ort
+    var haveEv = ev ? S.assign.filter(function (x) { return x.event_id === ev.id; }).map(function (x) { return x.user_id; }) : [];
+    if (ev && !canManageEvents()) return eventFavForm(ev, haveEv);
+    // Wie in der FBRO-App: Titel, Datum und Uhrzeit getrennt (Datum | Zeit nebeneinander), Ort; Labels links
     var local = ev ? toLocalInput(ev.starts_at).split('T') : ['', ''];
     var fields = [
-      { name: 'title', label: L('evTitle'), value: ev && ev.title },
+      { name: 'title', label: L('evTitle'), value: ev && ev.title, inline: true },
       { name: 'date', label: L('evDate'), type: 'date', value: local[0], half: true },
       { name: 'time', label: L('evTime'), type: 'time', value: local[1], half: true },
-      { name: 'place', label: L('evPlace'), value: ev && ev.place },
-      { name: 'comment', label: L('evComment'), type: 'textarea', value: ev && ev.comment },
-      { name: 'users', label: L('evAssignTo'), type: 'multi', value: ev ? S.assign.filter(function (x) { return x.event_id === ev.id; }).map(function (x) { return x.user_id; }) : [],
-        options: S.members.slice().sort(function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); }).map(function (m) { return { v: m.id, l: m.name + (m.id === S.me.id ? ' (' + L('you') + ')' : '') }; }) },
+      { name: 'place', label: L('evPlace'), value: ev && ev.place, inline: true },
+      { name: 'comment', label: L('evComment'), type: 'textarea', value: ev && ev.comment, inline: true },
+      favPeopleField(haveEv, true),
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false }
     ];
     // Änderungen optional auch für die folgenden Termine einer Serie übernehmen

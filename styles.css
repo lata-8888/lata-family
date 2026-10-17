@@ -34,8 +34,9 @@ p{margin:0}
 .fld.inl>span{flex:0 0 6.5em;margin:0}
 .fld.inl>input,.fld.inl>select,.fld.inl>.msel{flex:1;min-width:0;width:auto}
 .fld.inl>.msel{width:100%}
-.fld.inl:has(.msel){align-items:flex-start}
-.fld.inl:has(.msel)>span{padding-top:13px}
+.fld.inl:has(.msel),.fld.inl:has(textarea){align-items:flex-start}
+.fld.inl:has(.msel)>span,.fld.inl:has(textarea)>span{padding-top:13px}
+.fld.inl>textarea{flex:1;min-width:0;width:auto}
 .fld + .suggbox{margin:-8px 0 16px}
 .msel>summary{list-style:none;cursor:pointer;display:block;padding:12px 38px 12px 14px;border-radius:var(--r-btn);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
 .msel>summary::-webkit-details-marker{display:none}
