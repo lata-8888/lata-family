@@ -1,6 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    taskMore: 'Weitere Aufgaben',
     evTabWeek: 'Woche', evTabMonth: 'Monat', evPrevWeek: 'Vorherige Woche', evNextWeek: 'Nächste Woche', evWeekLabel: 'KW {n}', evNoneInPeriod: 'Keine Termine in diesem Zeitraum.', evFav: 'Als Favorit markieren', evUnfav: 'Favorit entfernen',
     shFavFor: 'Favorit für', shNobody: 'Niemand',
     shFavs: 'Meine Favoriten', shMore: 'Weitere Produkte', shMoreEmpty: 'Keine weiteren Produkte.', shFavAdd: 'Zu Favoriten hinzufügen', shFavRemove: 'Aus Favoriten entfernen', 
@@ -39,10 +40,10 @@ window.APP_DICT = {
     design_standard: 'Blue', design_standard_d: 'Blau, ruhig, wie die FBRO-App',
     design_holland: 'Orange', design_holland_d: 'Durchgehend Oranje, warm, runde Formen',
     design_light: 'Weiss', design_light_d: 'Weiss, feine Linien, zurückhaltend', design_petrol: 'Petrol', design_petrol_d: 'Tiefes Blaugrün, kühl und kräftig', designDefault: 'Standard Design',
-    navTasks: 'Tasks', taskNew: 'Task hinzufügen', taskEdit: 'Task bearbeiten', taskTitle: 'Aufgabe', taskNote: 'Notiz (optional)', taskAssignee: 'Zuweisen an', taskDue: 'Wunschtermin',
-    taskMissing: 'Aufgabe, Person und Wunschtermin sind Pflicht.', taskSecMine: 'Für mich', taskSecFrom: 'Von mir', taskSecOther: 'Weitere (Admin)', taskDone: 'Erledigt', taskReopen: 'Wieder öffnen',
-    taskFrom: 'Von {name}', taskTo: 'An {name}', taskFromTo: '{from} → {to}', taskDueOn: 'Wunschtermin: {date}', taskOverdue: 'Überfällig', taskEmpty: 'Keine Tasks.',
-    taskDeleteAsk: 'Task «{title}» löschen?', taskForbidden: 'Das darfst du bei diesem Task nicht ändern.', taskSelf: 'Für mich selbst', phoneShared: 'Diese Person nutzt den Login auch in einer anderen App. Die Nummer bitte dort ändern.',
+    navTasks: 'Tasks', taskNew: 'Task hinzufügen', taskEdit: 'Task bearbeiten', taskTitle: 'Aufgabe', taskNote: 'Notiz', taskAssignee: 'Zuweisen an', taskDue: 'Termin',
+    taskMissing: 'Bitte eine Aufgabe eingeben.', taskDone: 'Erledigt', taskReopen: 'Wieder öffnen',
+    taskDueOn: 'Wunschtermin: {date}', taskOverdue: 'Überfällig', taskEmpty: 'Keine Tasks.',
+    taskDeleteAsk: 'Task «{title}» löschen?', taskForbidden: 'Das darfst du bei diesem Task nicht ändern.', phoneShared: 'Diese Person nutzt den Login auch in einer anderen App. Die Nummer bitte dort ändern.',
     navShop: 'Einkauf', shNeed: 'Wunschliste', shLists: 'Einkaufslisten',
     shAdd: 'Produkt hinzufügen', shEmpty: 'Nichts auf der Liste.',
     shEditNeed: 'Produkt bearbeiten', shName: 'Produkt', shNote: 'Notiz', shList: 'Liste', shNoList: '(noch in keiner Liste)',
@@ -56,6 +57,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    taskMore: 'More tasks',
     evTabWeek: 'Week', evTabMonth: 'Month', evPrevWeek: 'Previous week', evNextWeek: 'Next week', evWeekLabel: 'Week {n}', evNoneInPeriod: 'No events in this period.', evFav: 'Mark as favorite', evUnfav: 'Remove favorite',
     shFavFor: 'Favorite for', shNobody: 'Nobody',
     shFavs: 'My favorites', shMore: 'More products', shMoreEmpty: 'No more products.', shFavAdd: 'Add to favorites', shFavRemove: 'Remove from favorites', 
@@ -94,10 +96,10 @@ window.APP_DICT = {
     design_standard: 'Blue', design_standard_d: 'Blue, calm, like the FBRO app',
     design_holland: 'Orange', design_holland_d: 'All orange, warm, rounded shapes',
     design_light: 'White', design_light_d: 'White, fine lines, understated', design_petrol: 'Petrol', design_petrol_d: 'Deep teal, cool and strong', designDefault: 'Default Design',
-    navTasks: 'Tasks', taskNew: 'Add task', taskEdit: 'Edit task', taskTitle: 'Task', taskNote: 'Note (optional)', taskAssignee: 'Assign to', taskDue: 'Preferred date',
-    taskMissing: 'Task, person and preferred date are required.', taskSecMine: 'For me', taskSecFrom: 'From me', taskSecOther: 'Others (admin)', taskDone: 'Done', taskReopen: 'Reopen',
-    taskFrom: 'From {name}', taskTo: 'To {name}', taskFromTo: '{from} → {to}', taskDueOn: 'Preferred date: {date}', taskOverdue: 'Overdue', taskEmpty: 'No tasks.',
-    taskDeleteAsk: 'Delete task “{title}”?', taskForbidden: 'You cannot change this task.', taskSelf: 'For myself', phoneShared: 'This person also uses the login in another app. Please change the number there.',
+    navTasks: 'Tasks', taskNew: 'Add task', taskEdit: 'Edit task', taskTitle: 'Task', taskNote: 'Note', taskAssignee: 'Assign to', taskDue: 'Date',
+    taskMissing: 'Please enter a task.', taskDone: 'Done', taskReopen: 'Reopen',
+    taskDueOn: 'Preferred date: {date}', taskOverdue: 'Overdue', taskEmpty: 'No tasks.',
+    taskDeleteAsk: 'Delete task “{title}”?', taskForbidden: 'You cannot change this task.', phoneShared: 'This person also uses the login in another app. Please change the number there.',
     navShop: 'Shopping', shNeed: 'Wishlist', shLists: 'Shopping lists',
     shAdd: 'Add product', shEmpty: 'Nothing on the list.',
     shEditNeed: 'Edit product', shName: 'Product', shNote: 'Note', shList: 'List', shNoList: '(not on any list yet)',
@@ -111,6 +113,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    taskMore: 'Overige taken',
     evTabWeek: 'Week', evTabMonth: 'Maand', evPrevWeek: 'Vorige week', evNextWeek: 'Volgende week', evWeekLabel: 'Week {n}', evNoneInPeriod: 'Geen afspraken in deze periode.', evFav: 'Als favoriet markeren', evUnfav: 'Favoriet verwijderen',
     shFavFor: 'Favoriet voor', shNobody: 'Niemand',
     shFavs: 'Mijn favorieten', shMore: 'Overige producten', shMoreEmpty: 'Geen overige producten.', shFavAdd: 'Aan favorieten toevoegen', shFavRemove: 'Uit favorieten verwijderen', 
@@ -149,10 +152,10 @@ window.APP_DICT = {
     design_standard: 'Blue', design_standard_d: 'Blauw, rustig, zoals de FBRO-app',
     design_holland: 'Orange', design_holland_d: 'Helemaal oranje, warm, ronde vormen',
     design_light: 'Wit', design_light_d: 'Wit, fijne lijnen, ingetogen', design_petrol: 'Petrol', design_petrol_d: 'Diep blauwgroen, koel en krachtig', designDefault: 'Standaard ontwerp',
-    navTasks: 'Taken', taskNew: 'Taak toevoegen', taskEdit: 'Taak bewerken', taskTitle: 'Taak', taskNote: 'Notitie (optioneel)', taskAssignee: 'Toewijzen aan', taskDue: 'Gewenste datum',
-    taskMissing: 'Taak, persoon en gewenste datum zijn verplicht.', taskSecMine: 'Voor mij', taskSecFrom: 'Van mij', taskSecOther: 'Overige (admin)', taskDone: 'Voltooid', taskReopen: 'Heropenen',
-    taskFrom: 'Van {name}', taskTo: 'Aan {name}', taskFromTo: '{from} → {to}', taskDueOn: 'Gewenste datum: {date}', taskOverdue: 'Te laat', taskEmpty: 'Geen taken.',
-    taskDeleteAsk: 'Taak «{title}» verwijderen?', taskForbidden: 'Je mag deze taak niet wijzigen.', taskSelf: 'Voor mezelf', phoneShared: 'Deze persoon gebruikt de login ook in een andere app. Wijzig het nummer daar.',
+    navTasks: 'Taken', taskNew: 'Taak toevoegen', taskEdit: 'Taak bewerken', taskTitle: 'Taak', taskNote: 'Notitie', taskAssignee: 'Toewijzen aan', taskDue: 'Datum',
+    taskMissing: 'Voer een taak in.', taskDone: 'Voltooid', taskReopen: 'Heropenen',
+    taskDueOn: 'Gewenste datum: {date}', taskOverdue: 'Te laat', taskEmpty: 'Geen taken.',
+    taskDeleteAsk: 'Taak «{title}» verwijderen?', taskForbidden: 'Je mag deze taak niet wijzigen.', phoneShared: 'Deze persoon gebruikt de login ook in een andere app. Wijzig het nummer daar.',
     navShop: 'Boodschappen', shNeed: 'Verlanglijst', shLists: 'Boodschappenlijsten',
     shAdd: 'Product toevoegen', shEmpty: 'Niets op de lijst.',
     shEditNeed: 'Product bewerken', shName: 'Product', shNote: 'Notitie', shList: 'Lijst', shNoList: '(nog op geen enkele lijst)',

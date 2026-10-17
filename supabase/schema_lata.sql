@@ -57,12 +57,18 @@ create table if not exists public."lata-tasks" (
   title text not null check (char_length(title) between 1 and 120),
   note text check (note is null or char_length(note) <= 500),
   created_by uuid not null references public."lata-profiles"(id),
-  assigned_to uuid not null references public."lata-profiles"(id),
-  due_date date not null,
+  due_date date,   -- Termin optional
   done boolean not null default false,
   done_at timestamptz,
   created_at timestamptz not null default now()
 );
+-- Favorit eines Tasks = zugeteilte Person (mehrere möglich)
+create table if not exists public."lata-task_assignees" (
+  task_id uuid not null references public."lata-tasks"(id) on delete cascade,
+  user_id uuid not null references public."lata-profiles"(id) on delete cascade,
+  primary key (task_id, user_id)
+);
+create index if not exists "lata-task_assignees_user_idx" on public."lata-task_assignees" (user_id);
 
 create table if not exists public."lata-recurring_tasks" (
   id uuid primary key default gen_random_uuid(),
@@ -134,6 +140,10 @@ $$ select coalesce((select value from public."lata-app_settings" where key = 'la
 create or replace function public.lata_can_see_list(p_list uuid) returns boolean language sql stable security definer set search_path = public as $$
   select p_list is null or exists (
     select 1 from public."lata-shop_lists" l where l.id = p_list and (not l.is_private or l.owner_id = auth.uid())) $$;
+create or replace function public.lata_can_manage_task(p_task uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select public.lata_is_admin() or exists (select 1 from public."lata-tasks" where id = p_task and created_by = auth.uid()) $$;
+create or replace function public.lata_is_task_assignee(p_task uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public."lata-task_assignees" where task_id = p_task and user_id = auth.uid()) $$;
 -- Wiederkehrende Tasks: Fälligkeitsberechnung
 create or replace function public.lata_next_due(p_freq text, p_weekday int, p_month_day int, p_from date) returns date language plpgsql immutable as $$
 declare d date;
@@ -171,8 +181,7 @@ begin
   if auth.uid() is null then return new; end if;
   if new.created_by <> old.created_by then raise exception 'TASK_FORBIDDEN'; end if;
   if not (old.created_by = auth.uid() or public.lata_is_admin()) then
-    if new.title is distinct from old.title or new.note is distinct from old.note
-       or new.assigned_to <> old.assigned_to or new.due_date <> old.due_date then
+    if new.title is distinct from old.title or new.note is distinct from old.note or new.due_date is distinct from old.due_date then
       raise exception 'TASK_FORBIDDEN';
     end if;
   end if;
@@ -382,7 +391,7 @@ end; $$;
 
 create or replace function public.lata_run_recurring() returns integer
 language plpgsql security definer set search_path = public as $$
-declare r record; due date; last_due date; n int := 0;
+declare r record; due date; last_due date; n int := 0; tid uuid;
 begin
   if not public.lata_is_user() then return 0; end if;
   for r in select * from public."lata-recurring_tasks" where active and next_due <= current_date for update loop
@@ -391,8 +400,8 @@ begin
       last_due := due;
       due := public.lata_advance_due(r.freq, r.weekday, r.month_day, due);
     end loop;
-    insert into public."lata-tasks" (title, note, created_by, assigned_to, due_date)
-    values (r.title, r.note, r.created_by, r.assigned_to, last_due);
+    insert into public."lata-tasks" (title, note, created_by, due_date) values (r.title, r.note, r.created_by, last_due) returning id into tid;
+    insert into public."lata-task_assignees" (task_id, user_id) values (tid, r.assigned_to);   -- die zugewiesene Person wird Favorit
     update public."lata-recurring_tasks" set next_due = due where id = r.id;
     n := n + 1;
   end loop;
@@ -442,6 +451,7 @@ alter table public."lata-events"           enable row level security;
 alter table public."lata-event_assignees"  enable row level security;
 alter table public."lata-event_responses"  enable row level security;
 alter table public."lata-tasks"            enable row level security;
+alter table public."lata-task_assignees"   enable row level security;
 alter table public."lata-recurring_tasks"  enable row level security;
 alter table public."lata-shop_lists"       enable row level security;
 alter table public."lata-products"         enable row level security;
@@ -467,13 +477,18 @@ create policy event_responses_select on public."lata-event_responses" for select
 create policy event_responses_own_write on public."lata-event_responses" for all to authenticated
   using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
 
-create policy tasks_select on public."lata-tasks" for select to authenticated
-  using (public.lata_is_user() and (created_by = auth.uid() or assigned_to = auth.uid() or public.lata_is_admin()));
+-- Tasks sind für alle sichtbar; ändern: Ersteller/in und Admins; erledigen zusätzlich die zugeteilten Personen
+create policy tasks_select on public."lata-tasks" for select to authenticated using (public.lata_is_user());
 create policy tasks_insert on public."lata-tasks" for insert to authenticated with check (public.lata_is_user() and created_by = auth.uid());
 create policy tasks_update on public."lata-tasks" for update to authenticated
-  using (public.lata_is_user() and (created_by = auth.uid() or assigned_to = auth.uid() or public.lata_is_admin()))
-  with check (public.lata_is_user() and (created_by = auth.uid() or assigned_to = auth.uid() or public.lata_is_admin()));
+  using (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()))
+  with check (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()));
 create policy tasks_delete on public."lata-tasks" for delete to authenticated using (created_by = auth.uid() or public.lata_is_admin());
+create policy task_assignees_select on public."lata-task_assignees" for select to authenticated using (public.lata_is_user());
+create policy task_assignees_own_write on public."lata-task_assignees" for all to authenticated   -- Stern: eigener Eintrag
+  using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
+create policy task_assignees_manage on public."lata-task_assignees" for all to authenticated      -- «Favorit für»: Ersteller/in und Admins
+  using (public.lata_can_manage_task(task_id)) with check (public.lata_can_manage_task(task_id));
 
 create policy recurring_admin on public."lata-recurring_tasks" for all to authenticated using (public.lata_is_admin()) with check (public.lata_is_admin());
 
@@ -524,7 +539,7 @@ grant execute on function public.lata_app_design(), public.lata_app_language() t
 -- ===== Realtime =====
 do $$ declare t text; begin
   foreach t in array array['lata-profiles','lata-events','lata-event_assignees','lata-event_responses','lata-tasks',
-                           'lata-recurring_tasks','lata-shop_lists','lata-products','lata-wishes'] loop
+                           'lata-recurring_tasks','lata-shop_lists','lata-products','lata-wishes','lata-task_assignees'] loop
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
       execute format('alter publication supabase_realtime add table public.%I', t);
     end if;

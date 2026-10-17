@@ -129,11 +129,12 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-others': false, 'need-catalog': false, 'task-more': false }, open: {}, phone: '' };
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
   var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
   S.assign = [];   // Zuteilung von Events an Personen: { event_id, user_id }
+  S.taskAssign = [];   // Favoriten von Tasks: { task_id, user_id }
   var installEvt = null;
   var isAdmin = function () { return !!(S.me && S.me.is_admin); };
   var canManageEvents = function () { return !!(S.me && (S.me.is_admin || S.me.is_event_manager)); };   // Admin oder Event Manager
@@ -292,6 +293,7 @@
   async function loadAll() {
     var uid = S.session.user.id;
     if (Date.now() - lastRecurring > 30 * 60000) { lastRecurring = Date.now(); try { await sb.rpc(F('run_recurring')); } catch (e) { /* ignorieren */ } }
+    var pTA = Promise.resolve(sb.from(T('task_assignees')).select('*'));
     var pEA = Promise.resolve(sb.from(T('event_assignees')).select('*'));   // parallel zu den übrigen Abfragen
     var r = await Promise.all([
       sb.from(T('profiles')).select('*').order('name'),
@@ -299,13 +301,15 @@
       sb.from(T('event_responses')).select('*'),
       sb.rpc(F('app_design')),
       sb.rpc(F('app_language')),
-      sb.from(T('tasks')).select('*').order('due_date'),
+      sb.from(T('tasks')).select('*').order('due_date', { nullsFirst: false }),
       sb.from(T('shop_lists')).select('*').order('created_at'),
       sb.from(T('products')).select('*').order('name'),
       sb.from(T('recurring_tasks')).select('*').order('created_at'),
       sb.from(T('wishes')).select('*')
     ]);
     r.forEach(function (x) { if (x.error) throw x.error; });
+    var rt = await pTA; if (rt.error) throw rt.error;
+    S.taskAssign = rt.data || [];
     var ra = await pEA; if (ra.error) throw ra.error;
     S.assign = ra.data || [];
     S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.products = r[7].data; S.rules = r[8].data; S.wishes = r[9].data || [];
@@ -526,56 +530,67 @@
     return html;
   }
 
-  /* ---------- Tasks: jede Person kann einer anderen eine Aufgabe mit Wunschtermin zuweisen ---------- */
+  /* ---------- Tasks: gemeinsame Aufgaben; Favorit = zugeteilte Person (lata-task_assignees); Termin optional ---------- */
   function today() { var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
   function fmtDue(d) { return new Date(d + 'T12:00:00').toLocaleDateString(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
+  function isFavTask(id) { return S.taskAssign.some(function (x) { return x.task_id === id && x.user_id === S.me.id; }); }
+  function taskWho(id) { return S.taskAssign.filter(function (x) { return x.task_id === id; }).map(function (x) { return x.user_id; }); }
+  function canEditTask(t) { return t.created_by === S.me.id || isAdmin(); }
+  // offene zuerst, nach Termin; ohne Termin am Ende; erledigte ganz unten
+  function taskSort(a, b) {
+    if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+    if (a.due_date || b.due_date) return a.due_date ? -1 : 1;
+    return a.title.localeCompare(b.title, LOCALE[lang]);
+  }
   function taskRow(t) {
-    var mine = t.assigned_to === S.me.id, canEdit = t.created_by === S.me.id || isAdmin(), canDone = mine || canEdit;
-    var over = !t.done && t.due_date < today();
-    var who = mine && t.created_by === S.me.id ? L('taskSelf') : mine ? L('taskFrom', { name: nameOf(t.created_by) }) : t.created_by === S.me.id ? L('taskTo', { name: nameOf(t.assigned_to) }) : L('taskFromTo', { from: nameOf(t.created_by), to: nameOf(t.assigned_to) });
+    var fav = isFavTask(t.id), canEdit = canEditTask(t), canDone = fav || canEdit;   // erledigen: Zugeteilte, Ersteller/in, Admins
+    var over = !t.done && t.due_date && t.due_date < today();
+    var who = taskWho(t.id).map(function (u) { return u === S.me.id ? L('you') : nameOf(u); });
+    var favLbl = fav ? L('shFavRemove') : L('shFavAdd');
     return '<li class="trow' + (t.done ? ' tdone' : '') + '">' +
-      (canDone ? '<button type="button" role="checkbox" class="tchk' + (t.done ? ' on' : '') + '" data-act="task-done" data-id="' + t.id + '" aria-checked="' + t.done + '" aria-label="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '" title="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '">' + ICON.check + '</button>' : '') +
-      '<div class="l"><b>' + esc(t.title) + '</b><span>' + esc(who) + '</span>' +
-      '<span class="' + (over ? 'tover' : '') + '">' + esc(L('taskDueOn', { date: fmtDue(t.due_date) })) + (over ? ' · ' + esc(L('taskOverdue')) : '') + '</span>' +
+      (canDone ? '<button type="button" role="checkbox" class="tchk' + (t.done ? ' on' : '') + '" data-act="task-done" data-id="' + t.id + '" aria-checked="' + t.done + '" aria-label="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '" title="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '">' + ICON.check + '</button>' : '<span class="tspace" aria-hidden="true"></span>') +
+      '<div class="l"><b>' + esc(t.title) + '</b>' +
+      (who.length ? '<span>' + esc(L('shFor', { names: who.join(', ') })) + '</span>' : '') +
+      (t.due_date ? '<span class="' + (over ? 'tover' : '') + '">' + esc(L('taskDueOn', { date: fmtDue(t.due_date) })) + (over ? ' · ' + esc(L('taskOverdue')) : '') + '</span>' : '') +
       (t.note ? '<span class="tnote">' + esc(t.note) + '</span>' : '') + '</div>' +
-      // Klar beschrifteter Knopf «Erledigt» / «Wieder öffnen» für die zugewiesene Person und die Person, die den Task erstellt hat
       '<div class="btnrow">' +
-      (canEdit ? '<button type="button" class="mini" data-act="task-edit" data-id="' + t.id + '">' + esc(L('edit')) + '</button>' +
-        '<button type="button" class="mini del" data-act="task-del" data-id="' + t.id + '">' + esc(L('del')) + '</button>' : '') + '</div></li>';
+      (canEdit ? '<button type="button" class="hico" data-act="task-edit" data-id="' + t.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' : '') +
+      '<button type="button" class="hico star' + (fav ? ' on' : '') + '" data-act="task-fav" data-id="' + t.id + '" aria-pressed="' + fav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button></div></li>';
   }
   function viewTasks() {
-    var open = function (a) { return a.filter(function (t) { return !t.done; }); };
-    var sort = function (a) { return a.slice().sort(function (x, y) { return (x.done - y.done) || x.due_date.localeCompare(y.due_date); }); };
-    var forMe = sort(S.tasks.filter(function (t) { return t.assigned_to === S.me.id; }));
-    // Tasks an sich selbst stehen nur unter «Für mich»
-    var fromMe = sort(S.tasks.filter(function (t) { return t.created_by === S.me.id && t.assigned_to !== S.me.id; }));
-    var other = sort(S.tasks.filter(function (t) { return t.assigned_to !== S.me.id && t.created_by !== S.me.id; }));
+    var favs = S.tasks.filter(function (t) { return isFavTask(t.id); }).sort(taskSort);
+    var more = S.tasks.filter(function (t) { return !isFavTask(t.id); }).sort(taskSort);
+    var open = function (a) { return a.filter(function (t) { return !t.done; }).length; };
     var list = function (a) { return a.length ? '<ul class="list">' + a.map(taskRow).join('') + '</ul>' : '<p class="muted">' + esc(L('taskEmpty')) + '</p>'; };
-    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navTasks')) + '</h1></div>' +
-      '<button type="button" class="hico addbtn" data-act="task-new" aria-label="' + esc(L('taskNew')) + '" title="' + esc(L('taskNew')) + '">' + ICON.plus + '</button></div>';
-    // Register (Tabs) statt Abschnitte, wie im Einkauf
-    var showOther = isAdmin() && other.length > 0;
-    var tv = S.taskView === 'from' || (S.taskView === 'other' && showOther) ? S.taskView : 'me';
-    var tab = function (v, label, n) { var on = v === tv; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="task-view" data-val="' + v + '">' + esc(label) + (n ? ' (' + n + ')' : '') + '</button>'; };
-    html += '<div class="subtabs" role="tablist">' + tab('me', L('taskSecMine'), open(forMe).length) + tab('from', L('taskSecFrom'), open(fromMe).length) + (showOther ? tab('other', L('taskSecOther'), open(other).length) : '') + '</div>';
-    html += list(tv === 'from' ? fromMe : tv === 'other' ? other : forMe);
-    return html;
+    // wie im Einkauf: oben meine Favoriten, darunter alle weiteren Aufgaben; «+» legt eine neue Aufgabe an
+    return '<div class="top"><div><h1 class="pagetitle">' + esc(L('navTasks')) + '</h1></div></div>' +
+      accordion('task-favs', L('shFavs'), open(favs), list(favs)) +
+      accordion('task-more', L('taskMore'), open(more), list(more), 'task-new', L('taskNew'));
   }
   async function taskForm(t) {
-    // Zuweisen darf man allen Personen, auch sich selbst
+    // «Favorit für»: eine oder mehrere Personen (0–n); der Termin ist optional
     var f = await askForm(t ? L('taskEdit') : L('taskNew'), [
-      { name: 'title', label: L('taskTitle'), value: t && t.title },
-      { name: 'assigned_to', label: L('taskAssignee'), type: 'select', value: t ? t.assigned_to : S.me.id, options: S.members.map(function (m) { return { v: m.id, l: m.name + (m.id === S.me.id ? ' (' + L('you') + ')' : '') }; }) },
-      { name: 'due_date', label: L('taskDue'), type: 'date', value: t ? t.due_date : '' },
-      { name: 'note', label: L('taskNote'), value: t && t.note }
-    ], null, null);
+      { name: 'title', label: L('taskTitle'), value: t && t.title, inline: true },
+      { name: 'due_date', label: L('taskDue'), type: 'date', value: t ? t.due_date : '', inline: true },
+      { name: 'note', label: L('taskNote'), value: t && t.note, inline: true },
+      { name: 'users', label: L('shFavFor'), type: 'multi', dropdown: true, value: t ? taskWho(t.id) : [S.me.id], options: memberOptions() }
+    ], null, null, t ? L('del') : null);   // «Löschen» unten im Dialog
     if (!f) return;
-    if (!f.title || !f.due_date || !f.assigned_to) return toast(L('taskMissing'));
-    var row = { title: f.title, assigned_to: f.assigned_to, due_date: f.due_date, note: f.note || null };
-    if (!t) row.created_by = S.me.id;
+    if (f.__extra) {
+      if (await askConfirm(L('del'), L('taskDeleteAsk', { title: t.title }), true))
+        return act(async function () { var r = await sb.from(T('tasks')).delete().eq('id', t.id); if (r.error) throw r.error; }, L('removed'));
+      return;
+    }
+    if (!f.title) return toast(L('taskMissing'));
     return act(async function () {
-      var r = t ? await sb.from(T('tasks')).update(row).eq('id', t.id) : await sb.from(T('tasks')).insert(row);
-      if (r.error) throw r.error;
+      var row = { title: f.title, due_date: f.due_date || null, note: f.note || null }, id = t ? t.id : null;
+      if (t) { var ru = await sb.from(T('tasks')).update(row).eq('id', id); if (ru.error) throw ru.error; }
+      else { row.created_by = S.me.id; var ri = await sb.from(T('tasks')).insert(row).select('id'); if (ri.error) throw ri.error; id = ri.data[0].id; }
+      var sel = f.users || [], had = t ? taskWho(id) : [];
+      var add = sel.filter(function (u) { return had.indexOf(u) < 0; }), rem = had.filter(function (u) { return sel.indexOf(u) < 0; });
+      if (add.length) { var ra = await sb.from(T('task_assignees')).insert(add.map(function (u) { return { task_id: id, user_id: u }; })); if (ra.error) throw ra.error; }
+      if (rem.length) { var rr = await sb.from(T('task_assignees')).delete().eq('task_id', id).in('user_id', rem); if (rr.error) throw rr.error; }
     }, L('saved'));
   }
 
@@ -699,10 +714,9 @@
   function needEditForm(p) {
     var w = myWish(p.id), fields = [];
     if (canRename(p)) fields.push({ name: 'name', label: L('shName'), value: p.name, inline: true });
-    if (w) {
-      fields.push({ name: 'note', label: L('shNote'), value: w.note, inline: true });
-      fields.push({ name: 'list_id', label: L('shList'), type: 'select', value: w.list_id || '', options: listOptions(true), inline: true });
-    }
+    // Notiz und Liste gehören zum Favoriten; ist das Produkt noch kein Favorit, gelten sie für die neu gewählten Personen
+    fields.push({ name: 'note', label: L('shNote'), value: w ? w.note : '', inline: true });
+    fields.push({ name: 'list_id', label: L('shList'), type: 'select', value: (w && w.list_id) || '', options: listOptions(true), inline: true });
     fields.push(favForField(p, w ? [S.me.id] : []));
     return askForm(L('shEditNeed'), fields, null, null, canRename(p) ? L('shProdDel') : null);   // «Produkt löschen» unten im Dialog
   }
@@ -804,7 +818,7 @@
     html += accordion('members', L('secMembers'), S.members.length, mbBody, 'add-user', L('addUser'));
     html += accordion('recur', L('recurTitle'), S.rules.length, recurBody(), 'rec-new', L('recurNew'));
     // Alle Tasks (Admin): bearbeiten, erledigen, löschen
-    var allT = S.tasks.slice().sort(function (x, y) { return (x.done - y.done) || x.due_date.localeCompare(y.due_date); });
+    var allT = S.tasks.slice().sort(taskSort);
     html += accordion('a-tasks', L('adminTasks'), allT.length, (allT.length ? '<ul class="list">' + allT.map(taskRow).join('') + '</ul>' : '<p class="muted">' + esc(L('taskEmpty')) + '</p>'), 'task-new', L('taskNew'));
     // Design der ganzen App (nur Admins)
     var dsg = DESIGNS.map(function (d) {
@@ -1152,7 +1166,6 @@
           }
         });
       }
-      case 'task-view': S.taskView = v; return render();
       case 'need-check': {
         // abhaken gilt für alle Wünschenden dieses Produkts in dieser Liste (ohne Liste: nur mein Wunsch)
         var cp = String(v).split(':'), cval = cp[0] === '1', clist = cp[1] || '';
@@ -1191,7 +1204,9 @@
           if (newName !== ne.name) { var rn = await sb.from(T('products')).update({ name: newName }).eq('id', id); if (rn.error) throw rn.error; }
           var had = {}; wishersOf(id).forEach(function (w) { had[w.user_id] = true; });
           var sel = nfe.users || [], addU = sel.filter(function (u) { return !had[u]; });
-          if (addU.length) { var ra = await sb.rpc(F('add_wish'), { p_name: newName, p_note: null, p_list: null, p_users: addU }); if (ra.error) throw ra.error; }
+          // Notiz/Liste angegeben, aber niemand gewählt und noch kein eigener Favorit: der Favorit wird für mich angelegt
+          if (!had[S.me.id] && !addU.length && (nfe.note || nfe.list_id)) addU = [S.me.id];
+          if (addU.length) { var ra = await sb.rpc(F('add_wish'), { p_name: newName, p_note: nfe.note || null, p_list: nfe.list_id || null, p_users: addU }); if (ra.error) throw ra.error; }
           if (had[S.me.id] && sel.indexOf(S.me.id) < 0) {   // mich abgewählt: mein Favorit entfällt
             var rd = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (rd.error) throw rd.error;
           } else if (had[S.me.id]) {
@@ -1244,11 +1259,14 @@
         var tk = S.tasks.filter(function (x) { return x.id === id; })[0]; if (!tk) return;
         return act(async function () { var r = await sb.from(T('tasks')).update({ done: !tk.done }).eq('id', id); if (r.error) throw r.error; });
       }
-      case 'task-del': {
-        var td = S.tasks.filter(function (x) { return x.id === id; })[0];
-        if (td && await askConfirm(L('del'), L('taskDeleteAsk', { title: td.title }), true))
-          return act(async function () { var r = await sb.from(T('tasks')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
-        return;
+      case 'task-fav': {
+        // Stern: Favorit setzen/entfernen (nur der eigene Eintrag)
+        var wasTf = isFavTask(id);
+        return act(async function () {
+          var r = wasTf ? await sb.from(T('task_assignees')).delete().eq('task_id', id).eq('user_id', S.me.id)
+            : await sb.from(T('task_assignees')).upsert({ task_id: id, user_id: S.me.id }, { onConflict: 'task_id,user_id', ignoreDuplicates: true });
+          if (r.error) throw r.error;
+        });
       }
       case 'applang': if (isAdmin() && v !== S.defaultLang) return rpc('set_app_language', { p_lang: v }, L('langSaved')); return;
       case 'design': if (isAdmin() && v !== adminDesign) return rpc('set_app_design', { p_design: v }, L('designSaved')); return;

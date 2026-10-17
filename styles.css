@@ -198,7 +198,7 @@ p{margin:0}
 .chip.pill{padding:8px 14px;font-weight:600;font-size:1rem}
 .chip.pill.on{background:var(--crown);color:#fff;border-color:var(--crown)}
 .chip.pill .cnt{opacity:.8;font-weight:500}
-.shopi .btnrow{flex-direction:row}
+.shopi .btnrow,.trow .btnrow:has(.hico){flex-direction:row;flex-wrap:nowrap;align-items:center}
 
 /* Anmeldung: Landesvorwahl + Nummer */
 .phonerow{display:flex;gap:8px}
