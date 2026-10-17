@@ -1,6 +1,6 @@
--- Family (lata) – Schema im gemeinsamen Supabase-Projekt APP_TMPL_DEV.
--- Idempotent: darf mehrfach ausgeführt werden. Tabellen "lata-*", Funktionen "lata_*".
--- Rekonstruiert aus dem laufenden DEV-Projekt. Keine Personendaten ausser dem Default-Admin.
+-- Family (lata) – Schema. Angewendet auf das Projekt «lata-family» (yiynvyqvkbkwamxopemj); APP_TMPL_DEV wird nach Entscheid nachgezogen.
+-- Idempotent: darf mehrfach ausgeführt werden. Tabellen "lata-*", Funktionen "lata_*". Keine Personendaten ausser dem Default-Admin.
+-- Projekte mit dem alten Einkaufsmodell (lata-needs) zusätzlich: supabase/upgrade_from_needs.sql.
 -- EMAIL_DOMAIN unten MUSS zu config.js passen und darf nachträglich nie geändert werden.
 
 create extension if not exists pgcrypto with schema extensions;
@@ -202,14 +202,10 @@ begin
   return new;
 end; $$;
 
-drop trigger if exists guard_default_admin on public."lata-profiles";
-create trigger guard_default_admin before update on public."lata-profiles" for each row execute function public.lata_guard_default_admin();
-drop trigger if exists guard_task_update on public."lata-tasks";
-create trigger guard_task_update before update on public."lata-tasks" for each row execute function public.lata_guard_task_update();
-drop trigger if exists guard_wish_update on public."lata-wishes";
-create trigger guard_wish_update before update on public."lata-wishes" for each row execute function public.lata_guard_wish_update();
-drop trigger if exists recurring_set_next on public."lata-recurring_tasks";
-create trigger recurring_set_next before insert or update on public."lata-recurring_tasks" for each row execute function public.lata_recurring_set_next();
+create or replace trigger guard_default_admin before update on public."lata-profiles" for each row execute function public.lata_guard_default_admin();
+create or replace trigger guard_task_update before update on public."lata-tasks" for each row execute function public.lata_guard_task_update();
+create or replace trigger guard_wish_update before update on public."lata-wishes" for each row execute function public.lata_guard_wish_update();
+create or replace trigger recurring_set_next before insert or update on public."lata-recurring_tasks" for each row execute function public.lata_recurring_set_next();
 
 -- ===== Benutzer anlegen (Auth-Token-Spalten müssen '' sein, nie NULL) =====
 create or replace function public.lata__create_user(p_name text, p_phone text, p_admin boolean) returns uuid
@@ -429,8 +425,6 @@ begin
 end; $$;
 
 -- Einkaufsliste aktualisieren: gekaufte Produkte gehen zurück zu den Favoriten (nie gelöscht)
-drop function if exists public.lata_set_wishers(uuid, uuid[], text, uuid);   -- ersetzt durch lata_add_wish (nur hinzufügen)
-drop function if exists public.lata_list_update(uuid, boolean);
 create or replace function public.lata_list_update(p_list uuid) returns integer
 language plpgsql security definer set search_path = public as $$
 declare n integer;
@@ -533,41 +527,6 @@ do $$ declare t text; begin
     end if;
   end loop;
 end $$;
-
--- ===== Einmalige Datenübernahme aus dem alten Modell (lata-needs / lata-need_assignees) =====
-do $$ begin
-  if to_regclass('public."lata-needs"') is not null then
-    if not exists (select 1 from public."lata-products") then
-      insert into public."lata-products" (id, name, created_by, created_at)
-      select distinct on (lower(btrim(name))) id, btrim(name), owner_id, created_at
-        from public."lata-needs" order by lower(btrim(name)), created_at;
-      insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected, checked)
-      select p.id, u.user_id, n.owner_id, n.note, n.list_id, n.selected, n.checked
-        from public."lata-needs" n
-        join public."lata-products" p on lower(btrim(p.name)) = lower(btrim(n.name))
-        cross join lateral (
-          select a.user_id from public."lata-need_assignees" a where a.need_id = n.id
-          union select n.owner_id where not exists (select 1 from public."lata-need_assignees" a where a.need_id = n.id)) u
-       where n.active
-      on conflict (product_id, user_id) do nothing;
-    end if;
-    -- alte Tabellen bleiben als Sicherung (ohne Zugriff, ohne Realtime); später mit drop table entfernen
-    drop trigger if exists guard_need_update on public."lata-needs";
-    if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'lata-needs') then
-      alter publication supabase_realtime drop table public."lata-needs"; end if;
-    if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'lata-need_assignees') then
-      alter publication supabase_realtime drop table public."lata-need_assignees"; end if;
-    alter table public."lata-needs" rename to "lata-needs_legacy";
-    alter table public."lata-need_assignees" rename to "lata-need_assignees_legacy";
-    revoke all on public."lata-needs_legacy", public."lata-need_assignees_legacy" from anon, authenticated;
-  end if;
-end $$;
-drop function if exists public.lata_can_see_need(uuid);
-drop function if exists public.lata_owns_need(uuid);
-drop function if exists public.lata_is_need_assignee(uuid);
-drop function if exists public.lata_guard_need_update();
-drop trigger if exists cleanup_product on public."lata-wishes";
-drop function if exists public.lata_cleanup_product();   -- war kurz im Einsatz, Produkte werden nicht mehr automatisch gelöscht
 
 -- ===== Default-Admin (Standard-PIN 232345 – beim ersten Login ändern!) =====
 select public.lata__create_user('System Administrator', '+41796232345', true);

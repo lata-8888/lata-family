@@ -40,11 +40,16 @@ Vanilla-JS-PWA ohne Build, GitHub Pages + Supabase (Auth, Postgres, RLS, Realtim
 - Hochladen per GitHub-Web-Upload ins Repo-Root (keine Unterordner möglich: `favicon-48.png` liegt deshalb im Root).
 
 ## Umgebungen
-| | DEV | PRD |
+| | Arbeitsprojekt | APP_TMPL_DEV |
 |---|---|---|
-| GitHub | `lata-family` (Pages: https://lata-8888.github.io/lata-family/) | _TODO_ |
-| Supabase | `APP_TMPL_DEV` (`eieeqwzekquvvngaauwp`), geteilt mit der Vorlage | _TODO_ |
-| EMAIL_DOMAIN | app-template-dev.example | _TODO (anders)_ |
+| Supabase | `lata-family` (`yiynvyqvkbkwamxopemj`), eigenes Projekt nur für diese App | `APP_TMPL_DEV` (`eieeqwzekquvvngaauwp`), geteilt mit der Vorlage |
+| Stand | Schema `supabase/schema_lata.sql` angewendet, nur Default-Admin | läuft mit den Familiendaten; wird **nach Entscheid** nachgezogen |
+| `config.js` | zeigt **noch nicht** hierher | zeigt hierher (GitHub Pages: https://lata-8888.github.io/lata-family/) |
+| EMAIL_DOMAIN | app-template-dev.example | app-template-dev.example |
+
+- **Datenbank-Arbeiten laufen gegen `lata-family`.** Was nach `APP_TMPL_DEV` kommt, wird von Fall zu Fall entschieden. Keine PRD ohne ausdrücklichen Auftrag.
+- Tabellen-/Funktionspräfixe `lata-`/`lata_` gelten unverändert (Schema ist für beide Projekte gleich).
+- Supabase-MCP: Befehle mit `drop`/`delete`/`update ohne where` lösen eine Bestätigung aus und laufen sonst ins Zeitlimit – solche Befehle im SQL-Editor ausführen.
 
 ## Auslieferung
 Geänderte Dateien ins Repo hochladen (Commit direkt auf `main`), danach Pages-Deploy abwarten (3–4 Min.) und Seite hart neu laden bzw. App am Handy schliessen und neu öffnen. Bei DB-Änderungen zuerst die Migration, dann die App.
