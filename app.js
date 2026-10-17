@@ -498,9 +498,10 @@
     return '<button type="button" class="' + cls + '" data-act="cal-day" data-val="' + key + '" aria-pressed="' + (key === sel) + '"><span class="dn">' + dn + '</span>' + ICON.cal +
       (evs.length > 1 ? '<span class="cn">' + evs.length + '</span>' : '') + (fav ? '<span class="cfav" aria-hidden="true">' + ICON.star + '</span>' : '') + '</button>';
   }
-  // Wochenansicht als Stundenplan: Tage als Spalten, Stunden als Zeilen; ganztägige und mehrtägige Events im Band darüber
+  // Wochenansicht: wie der Monat aufgebaut (Wochentage oben, je Tag eine Spalte), gezeigt wird 6–21 Uhr ohne Zeitangaben;
+  // Termine als Blöcke an ihrer Uhrzeit, ganztägige/mehrtägige Events als Chips oben in der Spalte
   function weekTimetable(from, byDay, sel, todayKey) {
-    var HP = 30, days = [], segs = {}, allday = {}, minH = 8, maxH = 18;
+    var H0 = 6, H1 = 21, HP = 16, days = [], segs = {}, allday = {};
     for (var c = 0; c < 7; c++) {
       var d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + c), k = isoDate(d);
       var ds = d.getTime(), de = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
@@ -508,10 +509,9 @@
       (byDay[k] || []).forEach(function (e) {
         if (e.time_set === false) { allday[k].push(e); return; }
         var st = new Date(e.starts_at).getTime(), en = e.ends_at ? evEndMs(e) : st + 3600000;   // ohne Ende: eine Stunde
-        var s0 = Math.max(st, ds), e0 = Math.min(en, de);
-        var sm = Math.round((s0 - ds) / 60000), em = Math.min(1440, Math.max(Math.round((e0 - ds) / 60000), sm + 30));
-        segs[k].push({ e: e, s: sm, en: em });
-        minH = Math.min(minH, Math.floor(sm / 60)); maxH = Math.max(maxH, Math.ceil(em / 60));
+        var sm = Math.round((Math.max(st, ds) - ds) / 60000), em = Math.min(1440, Math.max(Math.round((Math.min(en, de) - ds) / 60000), sm + 30));
+        sm = Math.min(Math.max(sm, H0 * 60), H1 * 60 - 45); em = Math.max(Math.min(em, H1 * 60), sm + 45);   // in den sichtbaren Bereich legen
+        segs[k].push({ e: e, s: sm, en: Math.min(em, H1 * 60) });
       });
     }
     days.forEach(function (dy) {   // überlappende Termine nebeneinander
@@ -519,25 +519,23 @@
       list.forEach(function (sg) { var l = 0; while (laneEnd[l] > sg.s) l++; laneEnd[l] = sg.en; sg.lane = l; });
       dy.lanes = Math.max(1, laneEnd.length);
     });
-    var wd = function (d) { return d.toLocaleDateString(LOCALE[lang], { weekday: 'short' }); };
-    var html = '<div class="tt"><div class="ttrow"><span></span>' + days.map(function (dy) {
-      return '<button type="button" class="ttd' + (dy.k === todayKey ? ' today' : '') + (dy.k === sel ? ' sel' : '') + '" data-act="cal-day" data-val="' + dy.k + '"><span>' + esc(wd(dy.d)) + '</span><b>' + dy.d.getDate() + '</b></button>';
-    }).join('') + '</div>';
     var anyAll = days.some(function (dy) { return allday[dy.k].length; });
-    if (anyAll) html += '<div class="ttrow ttad"><span title="' + esc(L('evNoTime')) + '">&#9788;</span>' + days.map(function (dy) {
-      var l = allday[dy.k];
-      return '<div class="ttc">' + l.slice(0, 3).map(function (e) { return '<button type="button" class="ttchip' + (isFavEvent(e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '"' + (catOf(e) ? ' style="--c:' + catColor(e) + '"' : '') + ' title="' + esc(e.title) + '">' + esc(e.title) + '</button>'; }).join('') + (l.length > 3 ? '<i>+' + (l.length - 3) + '</i>' : '') + '</div>';
-    }).join('') + '</div>';
-    var hours = ''; for (var h = minH; h < maxH; h++) hours += '<b style="top:' + (h - minH) * HP + 'px">' + String(h).padStart(2, '0') + '</b>';
     var now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
-    html += '<div class="ttbody" style="height:' + (maxH - minH) * HP + 'px;--hp:' + HP + 'px"><div class="tth">' + hours + '</div>' + days.map(function (dy) {
+    var html = '<div class="calgrid calwd">' + days.map(function (dy) { return '<span>' + esc(dy.d.toLocaleDateString(LOCALE[lang], { weekday: 'short' })) + '</span>'; }).join('') + '</div>';
+    html += '<div class="wkgrid">' + days.map(function (dy) {
+      var chips = allday[dy.k].slice(0, 2).map(function (e) {
+        return '<button type="button" class="wkchip' + (isFavEvent(e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '"' + (catOf(e) ? ' style="--c:' + catColor(e) + '"' : '') + ' title="' + esc(e.title) + '">' + esc(e.title) + '</button>';
+      }).join('') + (allday[dy.k].length > 2 ? '<i>+' + (allday[dy.k].length - 2) + '</i>' : '');
       var blocks = segs[dy.k].map(function (sg) {
-        var top = (sg.s - minH * 60) / 60 * HP, hgt = Math.max(14, (sg.en - sg.s) / 60 * HP - 1), w = 100 / dy.lanes;
-        return '<button type="button" class="ttb' + (isFavEvent(sg.e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '" style="' + (catOf(sg.e) ? '--c:' + catColor(sg.e) + ';' : '') + 'top:' + top + 'px;height:' + hgt + 'px;left:' + sg.lane * w + '%;width:calc(' + w + '% - 1px)" title="' + esc(sg.e.title) + '">' + esc(sg.e.title) + '</button>';
+        var top = (sg.s - H0 * 60) / 60 * HP, hgt = Math.max(14, (sg.en - sg.s) / 60 * HP - 1), w = 100 / dy.lanes;
+        return '<button type="button" class="wkb' + (isFavEvent(sg.e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '" style="' + (catOf(sg.e) ? '--c:' + catColor(sg.e) + ';' : '') + 'top:' + top + 'px;height:' + hgt + 'px;left:' + sg.lane * w + '%;width:calc(' + w + '% - 1px)" title="' + esc(sg.e.title) + '">' + esc(sg.e.title) + '</button>';
       }).join('');
-      var nowLine = dy.k === todayKey && nowMin >= minH * 60 && nowMin <= maxH * 60 ? '<div class="ttnow" style="top:' + (nowMin - minH * 60) / 60 * HP + 'px"></div>' : '';
-      return '<div class="ttcol' + (dy.k === sel ? ' sel' : '') + '">' + blocks + nowLine + '</div>';
-    }).join('') + '</div></div>';
+      var nowLine = dy.k === todayKey && nowMin >= H0 * 60 && nowMin <= H1 * 60 ? '<div class="wknow" style="top:' + (nowMin - H0 * 60) / 60 * HP + 'px"></div>' : '';
+      return '<div class="wkcol' + (dy.k === todayKey ? ' today' : '') + (dy.k === sel ? ' sel' : '') + '">' +
+        '<button type="button" class="wkday" data-act="cal-day" data-val="' + dy.k + '" aria-pressed="' + (dy.k === sel) + '">' + dy.d.getDate() + '</button>' +
+        (anyAll ? '<div class="wkad">' + chips + '</div>' : '') +
+        '<div class="wkbody" style="height:' + (H1 - H0) * HP + 'px">' + blocks + nowLine + '</div></div>';
+    }).join('') + '</div>';
     // Legende: Kategorien, die in dieser Woche vorkommen
     var used = {}; days.forEach(function (dy) { (byDay[dy.k] || []).forEach(function (e) { if (catOf(e)) used[e.category] = true; }); });
     var leg = EVCATS.filter(function (x) { return used[x.id]; });

@@ -305,28 +305,20 @@ textarea[name]{width:100%;font-family:inherit;font-size:1rem;padding:10px 12px;b
 .sugg{border-bottom-color:color-mix(in srgb,var(--crown) 25%,transparent)}
 .sugg:hover,.sugg:focus-visible{background:color-mix(in srgb,var(--crown) 14%,transparent)}
 
-/* Wochen-Stundenplan */
-.tt{border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface);overflow:hidden;margin-bottom:6px}
-.ttrow{display:grid;grid-template-columns:30px repeat(7,minmax(0,1fr));border-bottom:1px solid var(--line)}
-.ttd{border:0;background:none;padding:6px 0 4px;display:flex;flex-direction:column;align-items:center;font:inherit;color:var(--ink);cursor:pointer;border-left:1px solid var(--line)}
-.ttd span{font-size:.62rem;text-transform:uppercase;color:var(--muted)}
-.ttd b{font-size:.95rem}
-.ttd.today b{color:var(--crown)}
-.ttd.sel{background:var(--crown-soft)}
-.ttad{align-items:stretch;background:color-mix(in srgb,var(--crown) 6%,var(--surface))}
-.ttad>span{display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--muted)}
-.ttc{border-left:1px solid var(--line);padding:2px;display:flex;flex-direction:column;gap:2px;min-width:0}
-.ttc i{font-size:.58rem;color:var(--muted);text-align:center;font-style:normal}
-.ttchip{position:relative;border:0;border-left:3px solid var(--c,var(--crown));background:color-mix(in srgb,var(--c,var(--crown)) 20%,var(--surface));color:var(--ink);font:inherit;font-size:.58rem;line-height:1.2;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
-.ttbody{display:grid;grid-template-columns:30px repeat(7,minmax(0,1fr));position:relative}
-.tth{position:relative}
-.tth b{position:absolute;right:3px;transform:translateY(-6px);font-size:.58rem;font-weight:400;color:var(--muted)}
-.ttcol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px);background-size:100% var(--hp)}
-.ttcol.sel{background-color:color-mix(in srgb,var(--crown) 8%,transparent)}
-.ttb{position:absolute;border:0;border-left:3px solid var(--c,var(--crown));background:color-mix(in srgb,var(--c,var(--crown)) 20%,var(--surface));color:var(--ink);font:inherit;font-size:.6rem;line-height:1.1;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;cursor:pointer;word-break:break-word}
-.ttnow{position:absolute;left:0;right:0;height:2px;background:var(--no,#c0392b);pointer-events:none}
-
-.ttb.fav::after,.ttchip.fav::after{content:"\2605";position:absolute;right:1px;top:0;font-size:.55rem;line-height:1;color:var(--warn)}
+/* Wochenansicht: wie der Monat, je Tag eine Spalte (6–21 Uhr) */
+.wkgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;align-items:start}
+.wkcol{border:1px solid var(--line);border-radius:var(--r-btn,10px);background:var(--surface);overflow:hidden;min-width:0}
+.wkcol.today{border:2px solid var(--crown)}
+.wkcol.sel{background:color-mix(in srgb,var(--crown) 10%,var(--surface))}
+.wkday{display:block;width:100%;border:0;background:none;padding:3px 0 2px;font:inherit;font-size:.9rem;color:var(--ink);cursor:pointer;text-align:center}
+.wkcol.today .wkday{color:var(--crown);font-weight:800}
+.wkad{min-height:34px;padding:0 2px 2px;display:flex;flex-direction:column;gap:2px}
+.wkad i{font-size:.58rem;color:var(--muted);text-align:center;font-style:normal;line-height:1}
+.wkchip{position:relative;border:0;border-left:3px solid var(--c,var(--crown));background:color-mix(in srgb,var(--c,var(--crown)) 20%,var(--surface));color:var(--ink);font:inherit;font-size:.58rem;line-height:1.2;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
+.wkbody{position:relative;border-top:1px solid var(--line)}
+.wkb{position:absolute;border:0;border-left:3px solid var(--c,var(--crown));background:color-mix(in srgb,var(--c,var(--crown)) 20%,var(--surface));color:var(--ink);font:inherit;font-size:.6rem;line-height:1.1;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;cursor:pointer;word-break:break-word}
+.wknow{position:absolute;left:0;right:0;height:2px;background:var(--no,#c0392b);pointer-events:none}
+.wkb.fav::after,.wkchip.fav::after{content:"\2605";position:absolute;right:1px;top:0;font-size:.55rem;line-height:1;color:var(--warn)}
 .ttleg{display:flex;flex-wrap:wrap;gap:4px 10px;margin:0 0 8px;font-size:.7rem;color:var(--muted)}
 .ttleg span{display:inline-flex;align-items:center;gap:4px}
 .ttleg i,.catopt i{width:10px;height:10px;border-radius:50%;background:var(--c);display:inline-block}
