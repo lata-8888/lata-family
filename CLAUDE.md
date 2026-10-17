@@ -1,6 +1,6 @@
 # Family – Projektkontext für Claude Code
 
-Familien-App (Events, Tasks, Einkauf) im gemeinsamen Supabase-Projekt mit der Vorlage `APP_TMPL_DEV`.
+Familien-App (Events, Tasks, Einkauf) im eigenen Supabase-Projekt `lata-family` (Präfixe `lata-`/`lata_` bleiben; `APP_TMPL_DEV` wird nach Entscheid nachgezogen).
 
 ## Was die App kann
 - **Login** mit Handynummer + PIN (Standard-PIN = letzte 6 Ziffern der Nummer). Keine Selbstregistrierung. Nummernfeld mit Länderauswahl **CH +41 / DE +49 / Andere**, Live-Formatierung. Gespeichert wird `+41791234567`.
@@ -43,8 +43,8 @@ Vanilla-JS-PWA ohne Build, GitHub Pages + Supabase (Auth, Postgres, RLS, Realtim
 | | Arbeitsprojekt | APP_TMPL_DEV |
 |---|---|---|
 | Supabase | `lata-family` (`yiynvyqvkbkwamxopemj`), eigenes Projekt nur für diese App | `APP_TMPL_DEV` (`eieeqwzekquvvngaauwp`), geteilt mit der Vorlage |
-| Stand | Schema `supabase/schema_lata.sql` angewendet, nur Default-Admin | läuft mit den Familiendaten; wird **nach Entscheid** nachgezogen |
-| `config.js` | zeigt **noch nicht** hierher | zeigt hierher (GitHub Pages: https://lata-8888.github.io/lata-family/) |
+| Stand | Schema `supabase/schema_lata.sql` angewendet; startet nur mit dem Default-Admin | enthält die bisherigen Familiendaten; wird **nach Entscheid** nachgezogen |
+| `config.js` | zeigt hierher (GitHub Pages: https://lata-8888.github.io/lata-family/) | zeigt nicht mehr hierher |
 | EMAIL_DOMAIN | app-template-dev.example | app-template-dev.example |
 
 - **Datenbank-Arbeiten laufen gegen `lata-family`.** Was nach `APP_TMPL_DEV` kommt, wird von Fall zu Fall entschieden. Keine PRD ohne ausdrücklichen Auftrag.

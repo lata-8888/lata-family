@@ -3,8 +3,8 @@
 // DEV und PRD haben je eine eigene config.js (anderes Supabase-Projekt, andere EMAIL_DOMAIN).
 window.APP_CONFIG = {
   APP_NAME: 'Family',
-  SUPABASE_URL: 'https://eieeqwzekquvvngaauwp.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_MlOLy5BzHQOk5oOddYZFbg_PR6DiBQ4',
+  SUPABASE_URL: 'https://yiynvyqvkbkwamxopemj.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_fzzxCiuabsL8APRb0xa8_A_VcbwSslk',
   EMAIL_DOMAIN: 'app-template-dev.example',   // muss EXAKT zu app_settings.email_domain in schema.sql passen; DEV ≠ PRD; nie nachträglich ändern
   TABLE_PREFIX: 'lata-',               // Tabellen dieser App im gemeinsamen Supabase-Projekt: lata-profiles, lata-events ...
   FUNCTION_PREFIX: 'lata_',            // Funktionen: lata_set_admin ... (siehe supabase/schema_lata.sql)
