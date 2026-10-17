@@ -103,11 +103,17 @@ create table if not exists public."lata-wishes" (
   created_by uuid references public."lata-profiles"(id) on delete set null,
   note text check (note is null or char_length(note) <= 80),
   list_id uuid references public."lata-shop_lists"(id) on delete set null,
-  selected boolean not null default true,
-  checked boolean not null default false,
+  selected boolean not null default false,   -- auf der Einkaufsliste (Favorit angetickt)
+  checked boolean not null default false,    -- gekauft/abgehakt
   created_at timestamptz not null default now(),
   unique (product_id, user_id)
 );
+alter table public."lata-wishes" alter column selected set default false;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'lata-wishes_checked_needs_selected') then
+    alter table public."lata-wishes" add constraint "lata-wishes_checked_needs_selected" check (not checked or selected);
+  end if;
+end $$;
 create index if not exists "lata-wishes_user_idx" on public."lata-wishes" (user_id);
 create index if not exists "lata-wishes_list_idx" on public."lata-wishes" (list_id);
 
@@ -178,15 +184,11 @@ end; $$;
 -- bewusst NICHT security definer: current_user muss die Rolle der Sitzung sein (authenticated) bzw. der Funktionsbesitzer bei RPC-Aufrufen
 create or replace function public.lata_guard_wish_update() returns trigger language plpgsql set search_path = public as $$
 begin
-  -- Aufrufe aus security-definer-Funktionen (Rolle != authenticated) und ohne Login sind nicht eingeschränkt
   if auth.uid() is null or current_user not in ('authenticated', 'anon') then return new; end if;
-  if new.product_id <> old.product_id or new.user_id <> old.user_id or new.created_by is distinct from old.created_by then
+  if new.product_id <> old.product_id or new.user_id <> old.user_id then raise exception 'NEED_FORBIDDEN'; end if;
+  if auth.uid() = old.user_id then return new; end if;   -- die Person ändert ihren Wunsch frei; alle anderen dürfen nur abhaken
+  if new.selected <> old.selected or new.note is distinct from old.note or new.list_id is distinct from old.list_id then
     raise exception 'NEED_FORBIDDEN';
-  end if;
-  if auth.uid() = old.user_id then return new; end if;               -- die Person selbst darf alles ändern
-  if new.selected <> old.selected then raise exception 'NEED_FORBIDDEN'; end if;   -- «ausgewählt» nur die Person selbst
-  if auth.uid() is distinct from old.created_by and (new.note is distinct from old.note or new.list_id is distinct from old.list_id) then
-    raise exception 'NEED_FORBIDDEN';                                -- Notiz/Liste: Person oder Zuteilende/r; alle anderen nur «abgehakt»
   end if;
   return new;
 end; $$;
@@ -402,7 +404,7 @@ begin
 end; $$;
 
 -- ===== Einkauf: Produkte und Wünsche =====
--- Produkt (falls neu) anlegen und für die gewählten Personen (Standard: ich) auf die Wunschliste setzen. Gibt die Produkt-ID zurück.
+-- Produkt (falls neu) anlegen und für die gewählten Personen (Standard: ich) zum Favoriten machen (nicht angetickt). Gibt die Produkt-ID zurück.
 create or replace function public.lata_add_wish(p_name text, p_note text, p_list uuid, p_users uuid[]) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid; u uuid; users uuid[]; pub boolean;
@@ -420,51 +422,21 @@ begin
   foreach u in array users loop
     if not exists (select 1 from public."lata-profiles" where id = u) then raise exception 'Person nicht gefunden'; end if;
     insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected)
-    values (pid, u, me, nullif(btrim(coalesce(p_note, '')), ''), case when u = me or pub then p_list end, u = me)
+    values (pid, u, me, nullif(btrim(coalesce(p_note, '')), ''), case when u = me or pub then p_list end, false)
     on conflict (product_id, user_id) do nothing;
   end loop;
   return pid;
 end; $$;
 
--- Wünschende eines Produkts setzen: eigener Eintrag (Notiz/Liste/ein/aus), Einträge für andere hinzufügen oder – wenn ich sie angelegt habe – entfernen
-create or replace function public.lata_set_wishers(p_product uuid, p_users uuid[], p_note text, p_list uuid) returns void
-language plpgsql security definer set search_path = public as $$
-declare me uuid := auth.uid(); users uuid[] := coalesce(p_users, '{}'); u uuid; w record; pub boolean; nt text := nullif(btrim(coalesce(p_note, '')), '');
-begin
-  if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
-  if not exists (select 1 from public."lata-products" where id = p_product) then raise exception 'Produkt nicht gefunden'; end if;
-  if not public.lata_can_see_list(p_list) then raise exception 'NEED_FORBIDDEN'; end if;
-  pub := p_list is null or exists (select 1 from public."lata-shop_lists" where id = p_list and not is_private);
-  foreach u in array users loop
-    if not exists (select 1 from public."lata-profiles" where id = u) then raise exception 'Person nicht gefunden'; end if;
-    if u = me then
-      insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected) values (p_product, me, me, nt, p_list, true)
-      on conflict (product_id, user_id) do update set note = excluded.note, list_id = excluded.list_id;
-    else
-      insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected)
-      values (p_product, u, me, nt, case when pub then p_list end, false) on conflict (product_id, user_id) do nothing;
-    end if;
-  end loop;
-  for w in select * from public."lata-wishes" where product_id = p_product and not (user_id = any (users)) loop
-    if w.user_id = me or w.created_by = me then
-      delete from public."lata-wishes" where id = w.id;
-    elsif public.lata_can_see_list(w.list_id) then
-      raise exception 'NEED_FORBIDDEN';   -- sichtbarer Wunsch einer anderen Person, den ich nicht angelegt habe
-    end if;
-  end loop;
-end; $$;
-
--- Einkaufsliste aktualisieren: p_remove = gekaufte Wünsche entfernen; sonst nur abwählen (bleiben auf der Wunschliste)
-create or replace function public.lata_list_update(p_list uuid, p_remove boolean) returns integer
+-- Einkaufsliste aktualisieren: gekaufte Produkte gehen zurück zu den Favoriten (nie gelöscht)
+drop function if exists public.lata_set_wishers(uuid, uuid[], text, uuid);   -- ersetzt durch lata_add_wish (nur hinzufügen)
+drop function if exists public.lata_list_update(uuid, boolean);
+create or replace function public.lata_list_update(p_list uuid) returns integer
 language plpgsql security definer set search_path = public as $$
 declare n integer;
 begin
-  if not public.lata_is_user() or not public.lata_can_see_list(p_list) or p_list is null then raise exception 'NEED_FORBIDDEN'; end if;
-  if p_remove then
-    delete from public."lata-wishes" where list_id = p_list and selected and checked;
-  else
-    update public."lata-wishes" set selected = false, checked = false where list_id = p_list and selected and checked;
-  end if;
+  if not public.lata_is_user() or p_list is null or not public.lata_can_see_list(p_list) then raise exception 'NEED_FORBIDDEN'; end if;
+  update public."lata-wishes" set selected = false, checked = false where list_id = p_list and selected and checked;
   get diagnostics n = row_count;
   return n;
 end; $$;
@@ -521,13 +493,12 @@ create policy products_delete on public."lata-products" for delete to authentica
 -- Anlegen von Produkten nur über lata_add_wish (keine insert-Policy)
 
 create policy wishes_select on public."lata-wishes" for select to authenticated
-  using (public.lata_is_user() and (user_id = auth.uid() or created_by = auth.uid() or public.lata_can_see_list(list_id)));
+  using (public.lata_is_user() and (user_id = auth.uid() or public.lata_can_see_list(list_id)));
 create policy wishes_update on public."lata-wishes" for update to authenticated
-  using (public.lata_is_user() and (user_id = auth.uid() or created_by = auth.uid() or public.lata_can_see_list(list_id)))
+  using (public.lata_is_user() and (user_id = auth.uid() or public.lata_can_see_list(list_id)))
   with check (public.lata_can_see_list(list_id));
-create policy wishes_delete on public."lata-wishes" for delete to authenticated
-  using (user_id = auth.uid() or created_by = auth.uid() or (public.lata_is_admin() and public.lata_can_see_list(list_id)));
--- Anlegen von Wünschen nur über lata_add_wish / lata_set_wishers (keine insert-Policy)
+create policy wishes_delete on public."lata-wishes" for delete to authenticated using (user_id = auth.uid());   -- Favorit entfernt nur die Person selbst
+-- Anlegen von Wünschen nur über lata_add_wish (keine insert-Policy)
 
 -- ===== Rechte =====
 -- Nur lata-Tabellen anfassen (Vorlage-Tabellen nie). anon braucht keinen Tabellenzugriff.
@@ -540,7 +511,7 @@ end $$;
 revoke update on public."lata-profiles" from authenticated;
 grant update (name, language, theme, pin_changed, design) on public."lata-profiles" to authenticated;
 revoke insert, delete on public."lata-profiles" from authenticated;
--- Produkte und Wünsche entstehen nur über die RPCs lata_add_wish / lata_set_wishers
+-- Produkte und Wünsche entstehen nur über die RPC lata_add_wish
 revoke insert on public."lata-products", public."lata-wishes" from authenticated;
 
 do $$ declare f record; begin

@@ -65,6 +65,10 @@ p{margin:0}
 .hico svg[fill=currentColor]{fill:currentColor;stroke:none}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .addbtn{width:44px;height:40px;color:var(--crown);border:1.5px solid var(--line);border-radius:var(--r-btn);background:var(--surface)}
+.tspace{width:30px;height:30px;flex:0 0 30px}
+.hico.star{color:var(--muted)}
+.hico.star.on{color:var(--warn)}
+.hico.star.on svg{fill:currentColor}
 .addbtn.on{background:var(--crown);color:var(--surface);border-color:var(--crown)}
 .addbtn svg{width:24px;height:24px;stroke-width:2.4}
 

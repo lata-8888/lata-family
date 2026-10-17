@@ -567,38 +567,40 @@
   }
   function needMeta(it, mode) {
     var parts = [], notes = [];
-    it.ws.forEach(function (x) { if (x.note && notes.indexOf(x.note) < 0) notes.push(x.note); });
+    if (mode !== 'more') it.ws.forEach(function (x) { if (x.note && notes.indexOf(x.note) < 0) notes.push(x.note); });
     notes.forEach(function (n) { parts.push(esc(n)); });
-    if (mode === 'others' || ((mode === 'list' || mode === 'none') && (it.ws.length > 1 || !it.w))) {
+    // wer das Produkt sonst noch als Favorit führt (Weitere Produkte) bzw. wer es in der Einkaufsliste braucht
+    if ((mode === 'more' && it.ws.length) || ((mode === 'list' || mode === 'none') && (it.ws.length > 1 || !it.w))) {
       parts.push(esc(L('shFor', { names: it.ws.map(function (x) { return x.user_id === S.me.id ? L('you') : nameOf(x.user_id); }).join(', ') })));
     }
-    if (mode === 'need' || mode === 'assigned') { var l = listById(it.w.list_id); parts.push(l ? lockIcon(l) + esc(l.name) : esc(L('shNoList'))); }
-    if (mode === 'assigned' && it.w.created_by && it.w.created_by !== S.me.id) parts.push(esc(L('shBy', { name: nameOf(it.w.created_by) })));
+    if (mode === 'fav') { var l = listById(it.w.list_id); parts.push(l ? lockIcon(l) + esc(l.name) : esc(L('shNoList'))); }
     return parts.join(' · ');
   }
-  // Zeile eines Produkts; mode: need (meine Wunschliste) | assigned (mir zugeteilt) | others (Wünsche anderer) | list (in einer Einkaufsliste) | none (noch ohne Liste)
-  // Wunschliste (need/assigned): Kästchen = «auf die Einkaufsliste» (selected). Einkaufsliste (list/none): Kästchen = abgehakt (checked) für alle Wünschenden der Zeile, gedimmt unten.
+  // Zeile eines Produkts; mode: fav (meine Favoriten) | more (weitere Produkte) | list (in einer Einkaufsliste) | none (Favorit ohne Liste)
+  // Rechts: «…», Stern (gefüllt = Favorit) und Kästchen. Favoriten: Kästchen = «auf die Einkaufsliste» (selected).
+  // Einkaufsliste: Kästchen = gekauft (checked) für alle Wünschenden der Zeile, gedimmt unten.
   function needActions(it, mode) {
     var a = [];
     if (mode === 'none') a.push(['need-assign', L('shAssign'), 'ghost']);
-    if (canEditProduct(it.p) && mode !== 'others') a.push(['need-edit', L('edit'), 'ghost']);
+    if (canEditProduct(it.p)) a.push(['need-edit', L('edit'), 'ghost']);
     if ((mode === 'list' || mode === 'none') && it.w) a.push(['need-sel', L('shUnselect'), 'ghost', '0']);
-    a.push(it.w ? ['need-unwish', L('shWishRemove'), 'ghost'] : ['need-wish', L('shWishAdd'), 'ghost']);
+    a.push(['prod-assign', L('shFavOf'), 'ghost']);
     if (canRename(it.p)) a.push(['prod-del', L('shProdDel'), 'danger']);   // ausdrücklich löschen: für alle
     return a;
   }
   function needRow(it, mode) {
-    var wish = mode === 'need' || mode === 'assigned', shop = mode === 'list' || mode === 'none';
-    var all = it.ws.every(function (x) { return x.checked; });
-    var on = wish ? !!it.w.selected : all;
-    var lbl = wish ? L('shSelect') : L('shBought');
-    var check = (wish || shop)
-      ? '<button type="button" role="checkbox" class="tchk' + (on ? ' on' : '') + '" data-act="' + (wish ? 'need-sel' : 'need-check') + '" data-id="' + it.p.id + '" data-val="' + (wish ? (on ? '0' : '1') : (on ? '0' : '1') + ':' + it.listId) + '" aria-checked="' + on + '" aria-label="' + esc(lbl) + '" title="' + esc(lbl) + '">' + ICON.check + '</button>' : '';
-    var menu = needActions(it, mode).length
-      ? '<button type="button" class="hico" data-act="need-menu" data-id="' + it.p.id + '" data-val="' + mode + '" aria-label="' + esc(L('actions')) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button>' : '';
-    return '<li class="trow shopi' + ((wish ? it.w.checked : shop && all) ? ' chk' : '') + '">' +
+    var fav = mode === 'fav', shop = mode === 'list' || mode === 'none';
+    var bought = it.ws.length > 0 && it.ws.every(function (x) { return x.checked; });
+    var on = fav ? !!it.w.selected : bought;
+    var lbl = fav ? L('shSelect') : L('shBought');
+    var check = (fav || shop)
+      ? '<button type="button" role="checkbox" class="tchk' + (on ? ' on' : '') + '" data-act="' + (fav ? 'need-sel' : 'need-check') + '" data-id="' + it.p.id + '" data-val="' + (fav ? (on ? '0' : '1') : (on ? '0' : '1') + ':' + it.listId) + '" aria-checked="' + on + '" aria-label="' + esc(lbl) + '" title="' + esc(lbl) + '">' + ICON.check + '</button>' : '';
+    var isFav = !!it.w, favLbl = isFav ? L('shFavRemove') : L('shFavAdd');
+    var star = '<button type="button" class="hico star' + (isFav ? ' on' : '') + '" data-act="' + (isFav ? 'need-unwish' : 'need-wish') + '" data-id="' + it.p.id + '" aria-pressed="' + isFav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button>';
+    var menu = '<button type="button" class="hico" data-act="need-menu" data-id="' + it.p.id + '" data-val="' + mode + '" aria-label="' + esc(L('actions')) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button>';
+    return '<li class="trow shopi' + ((fav ? it.w.checked : shop && bought) ? ' chk' : '') + '">' +
       '<div class="l"><b>' + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
-      (menu ? '<div class="btnrow">' + menu + '</div>' : '') + check + '</li>';
+      '<div class="btnrow">' + menu + star + '</div>' + (check || '<span class="tspace" aria-hidden="true"></span>') + '</li>';
   }  // «…»-Menü eines Produkts (data-act wird vom globalen Klick-Handler ausgeführt)
   function needMenu(it, mode) {
     var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
@@ -611,7 +613,7 @@
   function viewShop() {
     var needView = S.shopView !== 'lists';
     var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1></div>' +
-      '<button type="button" class="hico addbtn" data-act="' + (needView ? 'need-new' : 'list-new') + '" aria-label="' + esc(needView ? L('shAdd') : L('shNewList')) + '" title="' + esc(needView ? L('shAdd') : L('shNewList')) + '">' + ICON.plus + '</button>' + '</div>';
+      (needView ? '' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shNewList')) + '" title="' + esc(L('shNewList')) + '">' + ICON.plus + '</button>') + '</div>';
     // zwei Register (Tabs) statt Knöpfe
     var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
     html += '<div class="subtabs" role="tablist">' + tab('need', L('shNeed')) + tab('lists', L('shLists')) + '</div>';
@@ -619,20 +621,14 @@
   }
   function viewNeeds() {
     var uid = S.me.id;
-    // meine Wunschliste, alphabetisch; das Kästchen wählt ein Produkt für die Einkaufsliste
-    var mineL = S.wishes.filter(function (w) { return w.user_id === uid; }).map(function (w) { return { p: productById(w.product_id), w: w, ws: [w], listId: w.list_id || '' }; })
+    // Meine Favoriten: meine Wünsche, alphabetisch; das Kästchen setzt ein Produkt auf die Einkaufsliste
+    var favs = S.wishes.filter(function (w) { return w.user_id === uid; }).map(function (w) { return { p: productById(w.product_id), w: w, ws: [w], listId: w.list_id || '' }; })
       .filter(function (it) { return it.p; }).sort(byItem);
-    // was andere wünschen: Produkte, die nur anderen Personen zugeteilt sind
-    var mine = {}; mineL.forEach(function (it) { mine[it.p.id] = true; });
-    var others = groupItems(S.wishes.filter(function (w) { return w.user_id !== uid && !mine[w.product_id]; }));
-    var html = '';
-    html += accordion('need-open', L('shNeeded'), mineL.length, ulOf(mineL.map(function (it) { return needRow(it, it.w.created_by === uid || !it.w.created_by ? 'need' : 'assigned'); }), 'shEmpty'));
-    html += accordion('need-others', L('shOthers'), others.length, ulOf(others.map(function (it) { return needRow(it, 'others'); }), 'shOthersEmpty'));
-    // Produktliste: Produkte, die aktuell niemand wünscht – bleiben erhalten, bis sie ausdrücklich gelöscht werden
-    var wished = {}; S.wishes.forEach(function (w) { wished[w.product_id] = true; });
-    var catalog = S.products.filter(function (p) { return !wished[p.id]; }).map(function (p) { return { p: p, w: null, ws: [], listId: '' }; }).sort(byItem);
-    html += accordion('need-catalog', L('shCatalog'), catalog.length, ulOf(catalog.map(function (it) { return needRow(it, 'catalog'); }), 'shCatalogEmpty'));
-    return html;
+    // Weitere Produkte: alle übrigen Produkte (auch ohne Wünsche); «+» legt ein neues Produkt an
+    var mine = {}; favs.forEach(function (it) { mine[it.p.id] = true; });
+    var more = S.products.filter(function (p) { return !mine[p.id]; }).map(function (p) { return { p: p, w: null, ws: S.wishes.filter(function (w) { return w.product_id === p.id; }), listId: '' }; }).sort(byItem);
+    return accordion('need-open', L('shFavs'), favs.length, ulOf(favs.map(function (it) { return needRow(it, 'fav'); }), 'shEmpty')) +
+      accordion('need-others', L('shMore'), more.length, ulOf(more.map(function (it) { return needRow(it, 'more'); }), 'shMoreEmpty'), 'need-new', L('shAdd'));
   }  function viewLists() {
     var sel = S.wishes.filter(function (w) { return w.selected; });   // nur auf der Wunschliste gewählte Produkte
     var none = groupItems(sel.filter(function (w) { return !w.list_id && w.user_id === S.me.id; }));   // ohne Liste: nur meine
@@ -642,7 +638,7 @@
       var items = groupItems(sel.filter(function (w) { return w.list_id === l.id; }), l.id);   // jedes Produkt einmal, mit den Namen der Wünschenden
       var isDone = function (it) { return it.ws.every(function (x) { return x.checked; }); };
       var itemsOpen = items.filter(function (it) { return !isDone(it); }), itemsDone = items.filter(isDone);
-      var dots = (l.owner_id === S.me.id || itemsDone.length) ? '<button type="button" class="hico" data-act="list-menu" data-id="' + l.id + '" aria-label="' + esc(L('shManage')) + '" title="' + esc(L('shManage')) + '">' + ICON.dots + '</button>' : '';
+      var dots = l.owner_id === S.me.id ? '<button type="button" class="hico" data-act="list-menu" data-id="' + l.id + '" aria-label="' + esc(L('shManage')) + '" title="' + esc(L('shManage')) + '">' + ICON.dots + '</button>' : '';
       var open = S.sec['lst-' + l.id] !== false;
       html += '<section class="acc' + (l.is_private ? ' privlist' : '') + '"><div class="acch">' +
         '<button type="button" class="acct" data-act="sec" data-id="lst-' + l.id + '" aria-expanded="' + open + '">' + lockIcon(l) + esc(l.name) + ' <span class="cnt">(' + itemsOpen.length + ')</span>' +
@@ -657,26 +653,27 @@
   function memberOptions() {
     return S.members.slice().sort(function (a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); }).map(function (m) { return { v: m.id, l: m.name + (m.id === S.me.id ? ' (' + L('you') + ')' : '') }; });
   }
-  // Produkt hinzufügen: der Server legt es nur an, wenn es noch nicht existiert (Name ohne Gross-/Kleinschreibung eindeutig), und setzt es für die gewählten Personen auf die Wunschliste
+  // Neues Produkt: der Server legt es nur an, wenn es noch nicht existiert (Name ohne Gross-/Kleinschreibung eindeutig), und macht es zu meinem Favoriten
   async function needAdd(name, extra) {
     extra = extra || {};
     name = String(name || '').trim();
     if (!name) return toast(L('shMissing'));
     var low = name.toLowerCase();
-    var users = extra.users && extra.users.length ? extra.users : [S.me.id];
     var prod = S.products.filter(function (p) { return p.name.trim().toLowerCase() === low; })[0];
-    if (prod && users.every(function (u) { return S.wishes.some(function (w) { return w.product_id === prod.id && w.user_id === u; }); })) return toast(L('shAlready'));
+    if (prod && myWish(prod.id)) return toast(L('shAlready'));
     return act(async function () {
-      var r = await sb.rpc(F('add_wish'), { p_name: name, p_note: extra.note || null, p_list: extra.list_id || null, p_users: users });
+      var r = await sb.rpc(F('add_wish'), { p_name: name, p_note: extra.note || null, p_list: extra.list_id || null, p_users: [S.me.id] });
       if (r.error) throw r.error;
     });
   }
+  // Produkt bearbeiten: Name (wer es angelegt hat, und Admins), Notiz und Liste gehören zu meinem Favoriten
   function needEditForm(p) {
     var w = myWish(p.id), fields = [];
     if (canRename(p)) fields.push({ name: 'name', label: L('shName'), value: p.name });
-    fields.push({ name: 'note', label: L('shNote'), value: w && w.note });
-    fields.push({ name: 'list_id', label: L('shList'), type: 'select', value: (w && w.list_id) || '', options: listOptions(true) });
-    fields.push({ name: 'users', label: L('evAssignTo'), type: 'multi', value: wishersOf(p.id).map(function (x) { return x.user_id; }), options: memberOptions() });
+    if (w) {
+      fields.push({ name: 'note', label: L('shNote'), value: w.note });
+      fields.push({ name: 'list_id', label: L('shList'), type: 'select', value: w.list_id || '', options: listOptions(true) });
+    }
     return askForm(L('shEditNeed'), fields);
   }
 
@@ -829,10 +826,8 @@
   function listMenu(l) {
     var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
     var b = function (act, label, cls) { return '<button type="button" class="btn ' + cls + '" data-act="' + act + '" data-id="' + esc(l.id) + '">' + esc(label) + '</button>'; };
-    var hasChecked = S.wishes.some(function (w) { return w.list_id === l.id && w.selected && w.checked; });
     var own = l.owner_id === S.me.id;
     wrap.innerHTML = '<div class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(l.name) + '"><h3>' + esc(l.name) + '</h3><div class="menu">' +
-      (hasChecked ? b('list-clear', L('shClearChecked'), 'ghost') : '') +
       (own ? b('list-rename', L('shRename'), 'ghost') + b('list-priv', l.is_private ? L('shMakeShared') : L('shMakePrivate'), 'ghost') + b('list-del', L('del'), 'danger') : '') +
       '<button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button></div></div>';
     document.body.appendChild(wrap);
@@ -1092,16 +1087,15 @@
       case 'shop-view': S.shopView = v; return render();
       case 'list-menu': { var lm = listById(id); if (lm) listMenu(lm); return; }
       case 'need-new': {
-        // alle bekannten Produkte (Katalog), «auf der Wunschliste» = ich führe es bereits
+        // neues Produkt; die Vorschläge zeigen den ganzen Katalog, «in deinen Favoriten» = ich führe es bereits
         var known = S.products.slice().sort(byName).map(function (p) { return { n: p.name, on: !!myWish(p.id) }; });
         var nf = await askForm(L('shAdd'), [
           { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList') },
           { name: 'note', label: L('shNote') },
-          { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true) },
-          { name: 'users', label: L('evAssignTo'), type: 'multi', value: [S.me.id], options: memberOptions() }
+          { name: 'list_id', label: L('shList'), type: 'select', value: '', options: listOptions(true) }
         ]);
         if (!nf) return;
-        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users });
+        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id });
       }
       case 'need-menu': { var np = productById(id); if (np) needMenu({ p: np, w: myWish(np.id), ws: [] }, v); return; }
       case 'ev-view': S.evView = v; return render();
@@ -1124,14 +1118,11 @@
         });
       }
       case 'list-update': {
-        // Gekaufte (abgehakte) Produkte dieser Liste: von den Wunschlisten austragen, die Einkaufsliste wird dadurch kürzer
+        // Gekaufte (abgehakte) Produkte dieser Liste gehen zurück zu den Favoriten (werden nie gelöscht)
         var nBought = S.wishes.filter(function (w) { return w.list_id === id && w.selected && w.checked; }).length;
         if (!nBought) return toast(L('shNothingChecked'));
-        return act(async function () { var r = await sb.rpc(F('list_update'), { p_list: id, p_remove: true }); if (r.error) throw r.error; }, L('shUpdated', { n: nBought }));
+        return act(async function () { var r = await sb.rpc(F('list_update'), { p_list: id }); if (r.error) throw r.error; }, L('shUpdated', { n: nBought }));
       }
-      case 'list-clear':
-        // abgehakte abwählen: bleiben auf den Wunschlisten
-        return act(async function () { var r = await sb.rpc(F('list_update'), { p_list: id, p_remove: false }); if (r.error) throw r.error; });
       case 'need-wish': {
         var wp = productById(id); if (!wp) return;
         return act(async function () { var r = await sb.rpc(F('add_wish'), { p_name: wp.name, p_note: null, p_list: null, p_users: [S.me.id] }); if (r.error) throw r.error; }, L('saved'));
@@ -1154,9 +1145,18 @@
           var newName = String(nfe.name == null ? ne.name : nfe.name).trim();
           if (!newName) throw new Error(L('shMissing'));
           if (newName !== ne.name) { var rn = await sb.from(T('products')).update({ name: newName }).eq('id', id); if (rn.error) throw rn.error; }
-          var r = await sb.rpc(F('set_wishers'), { p_product: id, p_users: nfe.users || [], p_note: nfe.note || null, p_list: nfe.list_id || null });
-          if (r.error) throw r.error;
+          if (myWish(id)) { var r = await sb.from(T('wishes')).update({ note: nfe.note || null, list_id: nfe.list_id || null }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; }
         }, L('saved'));
+      }
+      case 'prod-assign': {
+        // «Zum Favorit von … machen»: das Produkt bei anderen Personen zu den Favoriten hinzufügen (entfernen kann es nur die Person selbst mit dem Stern)
+        var ap = productById(id); if (!ap) return;
+        var have = {}; wishersOf(id).forEach(function (w) { have[w.user_id] = true; });
+        var opts = memberOptions().filter(function (o) { return !have[o.v]; });
+        if (!opts.length) return toast(L('shFavAll'));
+        var af2 = await askForm(L('shFavOf'), [{ name: 'users', label: L('shFavPeople'), type: 'multi', value: [], options: opts }]);
+        if (!af2 || !af2.users || !af2.users.length) return;
+        return act(async function () { var r = await sb.rpc(F('add_wish'), { p_name: ap.name, p_note: null, p_list: null, p_users: af2.users }); if (r.error) throw r.error; }, L('saved'));
       }
       case 'need-assign': {
         if (!S.lists.length) return toast(L('shNoLists'));

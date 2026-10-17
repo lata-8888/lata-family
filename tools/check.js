@@ -25,8 +25,19 @@ if (langs.every((l) => dict[l])) {
   for (const k of all) for (const l of langs) if (!(k in dict[l])) { fail(`Schlüssel «${k}» fehlt in ${l}`); missing++; }
   if (!missing) ok(`Übersetzungen: ${all.size} Schlüssel in de/en/nl`);
   const app = read('app.js') + read('index.html');
-  const used = new Set([...app.matchAll(/\bt\('([A-Za-z0-9_]+)'/g)].map((m) => m[1]));
-  for (const k of used) if (!all.has(k)) fail(`t('${k}') in app.js/index.html, aber nicht in i18n.js`);
+  const used = new Set([...app.matchAll(/\b(?:t|L)\('([A-Za-z0-9_]+)'(?!\s*\+)/g)].map((m) => m[1]));
+  const dyn = [...app.matchAll(/\b(?:t|L)\('([A-Za-z0-9_]+)'\s*\+/g)].map((m) => m[1]);   // z. B. L('design_' + id)
+  for (const k of used) if (!all.has(k)) fail(`Text «${k}» wird in app.js/index.html benutzt, fehlt aber in i18n.js`);
+  // doppelte Schlüssel innerhalb einer Sprache (der letzte würde den ersten still überschreiben)
+  const src = read('i18n.js');
+  for (const l of langs) {
+    const block = (src.match(new RegExp(`^  ${l}: \\{\\n([\\s\\S]*?)^  \\},?`, 'm')) || [])[1] || '';
+    const seen = new Set();
+    for (const m of block.matchAll(/(?:^|[,{]\s*)([A-Za-z0-9_]+): '/gm)) { if (seen.has(m[1])) fail(`Doppelter Schlüssel «${m[1]}» in ${l}`); seen.add(m[1]); }
+  }
+  // ungenutzte Texte (nur Hinweis; dynamisch gebildete Schlüssel wie L('role' + x) fallen hier auf)
+  const unused = [...all].filter((k) => !app.includes(k) && !dyn.some((d) => k.startsWith(d)));
+  if (unused.length) warn(`${unused.length} Text(e) in i18n.js ohne Verwendung: ${unused.slice(0, 12).join(', ')}${unused.length > 12 ? ' …' : ''}`);
 }
 
 // 3) Service Worker
