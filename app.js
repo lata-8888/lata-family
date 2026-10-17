@@ -185,8 +185,8 @@
           if (f.half && !(prev && prev.half)) html = '<div class="grid2">' + html;
           if (f.half && !(next && next.half)) html += '</div>';
           // pair:true: zwei Felder in einer Zeile (Label links, z. B. «Bis | Datum | Zeit»)
-          if (f.pair && !(prev && prev.pair)) html = '<div class="dtrow">' + html;
-          if (f.pair && !(next && next.pair)) html += '</div>';
+          if (f.pair && !(prev && prev.pair === f.pair)) html = '<div class="dtrow">' + html;
+          if (f.pair && !(next && next.pair === f.pair)) html += '</div>';
           return html;
         }).join('') +
         (extra ? '<button type="button" class="btn danger" data-x="extra">' + esc(extra) + '</button>' : '') + '<div class="row"><button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button><button class="btn" type="submit">' + esc(okLabel || L('save')) + '</button></div></form>';
@@ -1144,12 +1144,10 @@
     var fields = [
       { name: 'title', label: L('evTitle'), value: ev && ev.title, inline: true },
       { name: 'allday', label: L('evAllDay'), type: 'checkbox', value: !!ev && ev.time_set === false, hides: ['time', 'end_time'] },
-      { name: 'date', label: L('evDate'), type: 'date', value: local[0], inline: true },
-      { name: 'time', label: L('evTime'), type: 'time', value: ev && ev.time_set === false ? '' : local[1], inline: true },   // ganztägig: keine Zeit vorbelegen
-      { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: true },
-      { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: true },
-      { name: 'place', label: L('evPlace'), value: ev && ev.place, inline: true },
-      { name: 'comment', label: L('evComment'), type: 'textarea', value: ev && ev.comment, inline: true },
+      { name: 'date', label: L('evTime'), type: 'date', value: local[0], inline: true, pair: 1 },
+      { name: 'time', label: '', type: 'time', value: ev && ev.time_set === false ? '' : local[1], inline: true, pair: 1 },   // ganztägig: keine Zeit vorbelegen
+      { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: 2 },
+      { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
       { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })) },
       favPeopleField(haveEv, true),
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false }
@@ -1179,7 +1177,7 @@
     if (endDate && (endDate < f.date || (endDate === f.date && f.end_time && f.end_time < tm))) return toast(L('evEndBefore'));
     if (endDate === f.date && !f.end_time) endDate = '';
     var endsIso = endDate ? new Date(endDate + 'T' + (f.end_time || '00:00')).toISOString() : null;
-    var row = { title: f.title, place: f.place || null, comment: f.comment || null, starts_at: new Date(f.date + 'T' + tm).toISOString(), ends_at: endsIso, end_time_set: !!(endsIso && f.end_time), category: f.category || null, rsvp: !!f.rsvp, time_set: hasTime };
+    var row = { title: f.title, place: ev ? ev.place : null, comment: ev ? ev.comment : null, starts_at: new Date(f.date + 'T' + tm).toISOString(), ends_at: endsIso, end_time_set: !!(endsIso && f.end_time), category: f.category || null, rsvp: !!f.rsvp, time_set: hasTime };
     var users = f.users || [];
     // ersetzt die Zuteilung der angegebenen Events durch die gewählten Personen
     var setAssignees = async function (ids) {

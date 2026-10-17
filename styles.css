@@ -37,9 +37,10 @@ p{margin:0}
 .fld.inl:has(.msel),.fld.inl:has(textarea){align-items:flex-start}
 .fld.inl:has(.msel)>span,.fld.inl:has(textarea)>span{padding-top:13px}
 .dtrow{display:flex;gap:10px;align-items:center}
-.dtrow>.fld.inl:first-child{flex:2;min-width:0}
-.dtrow>.fld.inl:last-child:not(:first-child){flex:1;min-width:0}
+.dtrow>.fld.inl:first-child{flex:1;min-width:0}
+.dtrow>.fld.inl:last-child:not(:first-child){flex:0 0 7.5em;min-width:0}
 .fld.inl.nolbl>span{display:none}
+.dtrow input{padding-left:10px;padding-right:8px;font-size:15px}
 .fld.inl>textarea{flex:1;min-width:0;width:auto}
 .fld + .suggbox{margin:-8px 0 16px}
 .msel>summary{list-style:none;cursor:pointer;display:block;padding:12px 38px 12px 14px;border-radius:var(--r-btn);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
