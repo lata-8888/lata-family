@@ -39,8 +39,12 @@ create table if not exists public."lata-events" (
   time_set boolean not null default true,
   series_open boolean not null default false,
   series_rule jsonb,
-  comment text
+  comment text,
+  is_private boolean not null default false,   -- privat: nur für die Person sichtbar, die das Event angelegt hat
+  created_by uuid references public."lata-profiles"(id) on delete set null default auth.uid()
 );
+alter table public."lata-events" add column if not exists is_private boolean not null default false;
+alter table public."lata-events" add column if not exists created_by uuid references public."lata-profiles"(id) on delete set null default auth.uid();
 alter table public."lata-events" add column if not exists ends_at timestamptz;
 alter table public."lata-events" add column if not exists end_time_set boolean not null default false;
 alter table public."lata-events" add column if not exists category text;
@@ -71,8 +75,10 @@ create table if not exists public."lata-tasks" (
   due_date date,   -- Termin optional
   done boolean not null default false,
   done_at timestamptz,
+  is_private boolean not null default false,   -- privat: nur für die Ersteller/in sichtbar
   created_at timestamptz not null default now()
 );
+alter table public."lata-tasks" add column if not exists is_private boolean not null default false;
 -- Favorit eines Tasks = zugeteilte Person (mehrere möglich)
 create table if not exists public."lata-task_assignees" (
   task_id uuid not null references public."lata-tasks"(id) on delete cascade,
@@ -108,9 +114,14 @@ create table if not exists public."lata-products" (
   id uuid primary key default gen_random_uuid(),
   name text not null check (char_length(name) between 1 and 80),
   created_by uuid references public."lata-profiles"(id) on delete set null,
+  is_private boolean not null default false,   -- privat: nur für die Person sichtbar, die das Produkt angelegt hat
   created_at timestamptz not null default now()
 );
-create unique index if not exists "lata-products_name_key" on public."lata-products" (lower(btrim(name)));
+alter table public."lata-products" add column if not exists is_private boolean not null default false;
+drop index if exists public."lata-products_name_key";
+-- öffentlich global eindeutig, privat je Person eindeutig
+create unique index if not exists "lata-products_name_pub_key"  on public."lata-products" (lower(btrim(name))) where not is_private;
+create unique index if not exists "lata-products_name_priv_key" on public."lata-products" (lower(btrim(name)), created_by) where is_private;
 
 -- Wunscheintrag: eine Person führt ein Produkt auf ihrer Wunschliste, optional in einer Einkaufsliste
 create table if not exists public."lata-wishes" (
@@ -420,21 +431,31 @@ begin
 end; $$;
 
 -- ===== Einkauf: Produkte und Wünsche =====
+-- Ein Produkt wird erst privat, wenn niemand sonst es als Favorit führt
+create or replace function public.lata_guard_product_private() returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.is_private and not old.is_private and exists (select 1 from public."lata-wishes" w where w.product_id = new.id and w.user_id <> coalesce(new.created_by, auth.uid())) then
+    raise exception 'PRIVATE_SHARED';
+  end if;
+  return new;
+end; $$;
+create or replace trigger guard_product_private before update on public."lata-products" for each row execute function public.lata_guard_product_private();
+
 -- Produkt (falls neu) anlegen und für die gewählten Personen (Standard: ich) zum Favoriten machen (nicht angetickt). Gibt die Produkt-ID zurück.
-create or replace function public.lata_add_wish(p_name text, p_note text, p_list uuid, p_users uuid[]) returns uuid
+create or replace function public.lata_add_product(p_name text, p_note text, p_list uuid, p_users uuid[], p_private boolean default false) returns uuid
 language plpgsql security definer set search_path = public as $$
-declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid; u uuid; users uuid[]; pub boolean;
+declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid; u uuid; users uuid[]; pub boolean; priv boolean := coalesce(p_private, false);
 begin
   if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
   if char_length(nm) not between 1 and 80 then raise exception 'Name fehlt'; end if;
   if not public.lata_can_see_list(p_list) then raise exception 'NEED_FORBIDDEN'; end if;
-  pub := p_list is null or exists (select 1 from public."lata-shop_lists" where id = p_list and not is_private);
-  select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm);
+  pub := not priv and (p_list is null or exists (select 1 from public."lata-shop_lists" where id = p_list and not is_private));
+  select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end);
   if pid is null then
-    insert into public."lata-products" (name, created_by) values (nm, me) on conflict (lower(btrim(name))) do nothing returning id into pid;
-    if pid is null then select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm); end if;
+    insert into public."lata-products" (name, created_by, is_private) values (nm, me, priv) on conflict do nothing returning id into pid;
+    if pid is null then select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end); end if;
   end if;
-  users := case when p_users is null then array[me] else p_users end;   -- NULL = ich; leeres Array = nur das Produkt anlegen, kein Favorit
+  users := case when priv or p_users is null then array[me] else p_users end;   -- privat: nur ich
   foreach u in array users loop
     if not exists (select 1 from public."lata-profiles" where id = u) then raise exception 'Person nicht gefunden'; end if;
     insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected)
@@ -443,6 +464,8 @@ begin
   end loop;
   return pid;
 end; $$;
+create or replace function public.lata_add_wish(p_name text, p_note text, p_list uuid, p_users uuid[]) returns uuid
+language sql security definer set search_path = public as $$ select public.lata_add_product(p_name, p_note, p_list, p_users, false) $$;
 
 -- Einkaufsliste aktualisieren: gekaufte Produkte gehen zurück zu den Favoriten (nie gelöscht)
 create or replace function public.lata_list_update(p_list uuid) returns integer
@@ -477,31 +500,47 @@ end $$;
 create policy profiles_select     on public."lata-profiles" for select to authenticated using (public.lata_is_user());
 create policy profiles_update_own on public."lata-profiles" for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
 
-create policy events_select on public."lata-events" for select to authenticated using (public.lata_is_user());
-create policy events_manage on public."lata-events" for all to authenticated using (public.lata_can_manage_events()) with check (public.lata_can_manage_events());
-create policy event_assignees_select on public."lata-event_assignees" for select to authenticated using (public.lata_is_user());
-create policy event_assignees_manage on public."lata-event_assignees" for all to authenticated using (public.lata_can_manage_events()) with check (public.lata_can_manage_events());
+create policy events_select on public."lata-events" for select to authenticated
+  using (public.lata_is_user() and (not is_private or created_by = auth.uid()));
+create policy events_manage on public."lata-events" for all to authenticated
+  using (public.lata_can_manage_events() and (not is_private or created_by = auth.uid()))
+  with check (public.lata_can_manage_events() and (not is_private or created_by = auth.uid()));
+create policy event_assignees_select on public."lata-event_assignees" for select to authenticated
+  using (public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id));
+create policy event_assignees_manage on public."lata-event_assignees" for all to authenticated
+  using (public.lata_can_manage_events() and exists (select 1 from public."lata-events" e where e.id = event_id))
+  with check (public.lata_can_manage_events() and exists (select 1 from public."lata-events" e where e.id = event_id and (not e.is_private or user_id = auth.uid())));
 -- Favorit eines Events: jede Person setzt und entfernt ihren eigenen Eintrag (Stern in der Agenda)
-create policy event_assignees_add_any on public."lata-event_assignees" for insert to authenticated with check (public.lata_is_user());   -- «Favorit für»: andere hinzufügen
+create policy event_assignees_add_any on public."lata-event_assignees" for insert to authenticated
+  with check (public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id and (not e.is_private or user_id = auth.uid())));   -- «Favorit für»: andere hinzufügen
 create policy event_assignees_own_write on public."lata-event_assignees" for all to authenticated
-  using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
-create policy event_responses_select on public."lata-event_responses" for select to authenticated using (public.lata_is_user());
+  using (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id))
+  with check (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id));
+create policy event_responses_select on public."lata-event_responses" for select to authenticated
+  using (public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id));
 create policy event_responses_own_write on public."lata-event_responses" for all to authenticated
-  using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
+  using (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id))
+  with check (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id));
 
 -- Tasks sind für alle sichtbar; ändern: Ersteller/in und Admins; erledigen zusätzlich die zugeteilten Personen
-create policy tasks_select on public."lata-tasks" for select to authenticated using (public.lata_is_user());
+create policy tasks_select on public."lata-tasks" for select to authenticated
+  using (public.lata_is_user() and (not is_private or created_by = auth.uid()));
 create policy tasks_insert on public."lata-tasks" for insert to authenticated with check (public.lata_is_user() and created_by = auth.uid());
 create policy tasks_update on public."lata-tasks" for update to authenticated
-  using (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()))
-  with check (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()));
-create policy tasks_delete on public."lata-tasks" for delete to authenticated using (created_by = auth.uid() or public.lata_is_admin());
-create policy task_assignees_select on public."lata-task_assignees" for select to authenticated using (public.lata_is_user());
-create policy task_assignees_add_any on public."lata-task_assignees" for insert to authenticated with check (public.lata_is_user());   -- «Favorit für»: andere hinzufügen
-create policy task_assignees_own_write on public."lata-task_assignees" for all to authenticated   -- Stern: eigener Eintrag
-  using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
-create policy task_assignees_manage on public."lata-task_assignees" for all to authenticated      -- «Favorit für»: Ersteller/in und Admins
-  using (public.lata_can_manage_task(task_id)) with check (public.lata_can_manage_task(task_id));
+  using (public.lata_is_user() and (not is_private or created_by = auth.uid()) and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()))
+  with check (public.lata_is_user() and (not is_private or created_by = auth.uid()) and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()));
+create policy tasks_delete on public."lata-tasks" for delete to authenticated
+  using (created_by = auth.uid() or (public.lata_is_admin() and not is_private));
+create policy task_assignees_select on public."lata-task_assignees" for select to authenticated
+  using (public.lata_is_user() and exists (select 1 from public."lata-tasks" t where t.id = task_id));
+create policy task_assignees_add_any on public."lata-task_assignees" for insert to authenticated
+  with check (public.lata_is_user() and exists (select 1 from public."lata-tasks" t where t.id = task_id and (not t.is_private or user_id = auth.uid())));   -- «Favorit für»: andere hinzufügen
+create policy task_assignees_own_write on public."lata-task_assignees" for all to authenticated
+  using (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-tasks" t where t.id = task_id))
+  with check (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-tasks" t where t.id = task_id));
+create policy task_assignees_manage on public."lata-task_assignees" for all to authenticated
+  using (public.lata_can_manage_task(task_id) and exists (select 1 from public."lata-tasks" t where t.id = task_id))
+  with check (public.lata_can_manage_task(task_id) and exists (select 1 from public."lata-tasks" t where t.id = task_id and (not t.is_private or user_id = auth.uid())));
 
 create policy recurring_admin on public."lata-recurring_tasks" for all to authenticated using (public.lata_is_admin()) with check (public.lata_is_admin());
 
@@ -510,17 +549,20 @@ create policy shop_lists_insert on public."lata-shop_lists" for insert to authen
 create policy shop_lists_update on public."lata-shop_lists" for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy shop_lists_delete on public."lata-shop_lists" for delete to authenticated using (owner_id = auth.uid() or (public.lata_is_admin() and not is_private));
 
-create policy products_select on public."lata-products" for select to authenticated using (public.lata_is_user());
+create policy products_select on public."lata-products" for select to authenticated
+  using (public.lata_is_user() and (not is_private or created_by = auth.uid()));
 create policy products_update on public."lata-products" for update to authenticated
-  using (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_admin())) with check (created_by = auth.uid() or public.lata_is_admin());
+  using (public.lata_is_user() and (created_by = auth.uid() or (public.lata_is_admin() and not is_private)))
+  with check (created_by = auth.uid() or (public.lata_is_admin() and not is_private));
 -- Produkte bleiben im Katalog, bis sie ausdrücklich gelöscht werden (wer sie angelegt hat, oder Admin)
-create policy products_delete on public."lata-products" for delete to authenticated using (public.lata_is_user() and (created_by = auth.uid() or public.lata_is_admin()));
+create policy products_delete on public."lata-products" for delete to authenticated
+  using (public.lata_is_user() and (created_by = auth.uid() or (public.lata_is_admin() and not is_private)));
 -- Anlegen von Produkten nur über lata_add_wish (keine insert-Policy)
 
 create policy wishes_select on public."lata-wishes" for select to authenticated
-  using (public.lata_is_user() and (user_id = auth.uid() or public.lata_can_see_list(list_id)));
+  using (public.lata_is_user() and (user_id = auth.uid() or public.lata_can_see_list(list_id)) and exists (select 1 from public."lata-products" p where p.id = product_id));
 create policy wishes_update on public."lata-wishes" for update to authenticated
-  using (public.lata_is_user() and (user_id = auth.uid() or public.lata_can_see_list(list_id)))
+  using (public.lata_is_user() and (user_id = auth.uid() or public.lata_can_see_list(list_id)) and exists (select 1 from public."lata-products" p where p.id = product_id))
   with check (public.lata_can_see_list(list_id));
 create policy wishes_delete on public."lata-wishes" for delete to authenticated using (user_id = auth.uid());   -- Favorit entfernt nur die Person selbst
 -- Anlegen von Wünschen nur über lata_add_wish (keine insert-Policy)

@@ -1,6 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    privLabel: 'Privat (nur für mich sichtbar)', privShared: 'Privat nicht möglich: andere Personen führen dieses Produkt als Favorit.',
     evAllDay: 'Ganztägig',
     evCategory: 'Kategorie', catNone: 'Keine', cat_family: 'Familie', cat_friends: 'Freunde', cat_sport: 'Sport', cat_school: 'Schule', cat_work: 'Arbeit', cat_leisure: 'Freizeit', cat_birthday: 'Geburtstag', cat_other: 'Sonstiges',
     taskMine: 'Meine Aufgaben',
@@ -61,6 +62,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    privLabel: 'Private (only visible to me)', privShared: 'Cannot be private: other people have this product as a favorite.',
     evAllDay: 'All day',
     evCategory: 'Category', catNone: 'None', cat_family: 'Family', cat_friends: 'Friends', cat_sport: 'Sport', cat_school: 'School', cat_work: 'Work', cat_leisure: 'Leisure', cat_birthday: 'Birthday', cat_other: 'Other',
     taskMine: 'My tasks',
@@ -121,6 +123,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    privLabel: 'Privé (alleen voor mij zichtbaar)', privShared: 'Privé niet mogelijk: andere personen hebben dit product als favoriet.',
     evAllDay: 'Hele dag',
     evCategory: 'Categorie', catNone: 'Geen', cat_family: 'Familie', cat_friends: 'Vrienden', cat_sport: 'Sport', cat_school: 'School', cat_work: 'Werk', cat_leisure: 'Vrije tijd', cat_birthday: 'Verjaardag', cat_other: 'Overig',
     taskMine: 'Mijn taken',

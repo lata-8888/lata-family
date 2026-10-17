@@ -245,7 +245,13 @@
       fields.forEach(function (f) {
         if (f.type !== 'checkbox' || !f.hides) return;
         var cb = form.elements[f.name];
-        var apply = function () { f.hides.forEach(function (n) { var el = form.elements[n], box = el && el.closest('.fld'); if (box) { box.hidden = cb.checked; if (cb.checked) el.value = ''; } }); };
+        var apply = function () {
+          f.hides.forEach(function (n) {
+            var els = form.querySelectorAll('[name="' + n + '"]'); if (!els.length) return;
+            var box = els[0].closest('.fld'); if (box) box.hidden = cb.checked;
+            if (cb.checked) Array.prototype.forEach.call(els, function (el) { if (el.type === 'checkbox') { if (!el.disabled) el.checked = false; } else el.value = ''; });
+          });
+        };
         cb.addEventListener('change', apply); apply();
       });
       // Dropdown-Mehrfachauswahl: Kopfzeile zeigt die gewählten Namen
@@ -277,7 +283,8 @@
   }
   function errText(e) {
     var m = (e && e.message) || '';
-    if (/lata-products_name_key/.test(m)) return L('shNameTaken');
+    if (/lata-products_name_(pub_|priv_)?key/.test(m)) return L('shNameTaken');
+    if (/PRIVATE_SHARED/.test(m)) return L('privShared');
     if (/NEED_FORBIDDEN/.test(m)) return L('needForbidden');
     if (/PHONE_TAKEN|duplicate key/i.test(m)) return L('phoneTaken');
     if (/DEFAULT_ADMIN_PROTECTED/.test(m)) return L('protectedAdmin');
@@ -431,7 +438,7 @@
       '<button type="button" class="resp cntbtn' + (open ? ' is-open' : '') + '" data-act="who" data-id="' + e.id + '" aria-expanded="' + open + '"><b>' + yes.length + '</b>' + ICON.chev + '</button></div>' +
       (open ? '<div class="who"><div><h4>' + esc(L('evParticipants', { n: yes.length })) + '</h4><div class="chips">' + pills(yes) + '</div></div>' +
         '<div><h4>' + esc(L('evDeclined', { n: no.length })) + '</h4><div class="chips">' + pills(no) + '</div></div></div>' : '');
-    return '<article class="ccel' + (catOf(e) ? ' hascat' : '') + '"' + (catOf(e) ? ' style="--c:' + catColor(e) + '"' : '') + '><div class="cceh"><b>' + esc(evDayText(e)) + ' – ' + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
+    return '<article class="ccel' + (catOf(e) ? ' hascat' : '') + '"' + (catOf(e) ? ' style="--c:' + catColor(e) + '"' : '') + '><div class="cceh"><b>' + esc(evDayText(e)) + ' – ' + lockIcon(e) + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
       '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button>' +
       '<button type="button" class="accfold' + (info ? ' open' : '') + '" data-act="ev-card" data-id="' + e.id + '" aria-expanded="' + info + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' +
@@ -660,7 +667,7 @@
     var favLbl = fav ? L('shFavRemove') : L('shFavAdd');
     return '<li class="trow' + (t.done ? ' tdone' : '') + '">' +
       (canDone ? '<button type="button" role="checkbox" class="tchk' + (t.done ? ' on' : '') + '" data-act="task-done" data-id="' + t.id + '" aria-checked="' + t.done + '" aria-label="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '" title="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '">' + ICON.check + '</button>' : '<span class="tspace" aria-hidden="true"></span>') +
-      '<div class="l"><b>' + esc(t.title) + '</b>' +
+      '<div class="l"><b>' + lockIcon(t) + esc(t.title) + '</b>' +
       (who.length ? '<span>' + esc(L('shFor', { names: who.join(', ') })) + '</span>' : '') +
       (t.due_date ? '<span class="' + (over ? 'tover' : '') + '">' + esc(L('taskDueOn', { date: fmtDue(t.due_date) })) + (over ? ' · ' + esc(L('taskOverdue')) : '') + '</span>' : '') +
       (t.note ? '<span class="tnote">' + esc(t.note) + '</span>' : '') + '</div>' +
@@ -685,8 +692,9 @@
       { name: 'title', label: L('taskTitle'), value: t && t.title, inline: true },
       { name: 'due_date', label: L('taskDue'), type: 'date', value: t ? t.due_date : '', inline: true },
       { name: 'note', label: L('taskNote'), value: t && t.note, inline: true },
+      (!t || t.created_by === S.me.id) ? privField(t) : null,
       favPeopleField(have, true)
-    ] : [favPeopleField(have, false)];
+    ].filter(Boolean) : [favPeopleField(have, false)];
     var f = await askForm(t ? L('taskEdit') : L('taskNew'), fields, null, null, t && manage ? L('del') : null);   // «Löschen» unten im Dialog
     if (!f) return;
     if (f.__extra) {
@@ -697,6 +705,8 @@
     if (manage && !f.title) return toast(L('taskMissing'));
     return act(async function () {
       var row = { title: f.title, due_date: f.due_date || null, note: f.note || null }, id = t ? t.id : null;
+      if (f.private !== undefined) row.is_private = !!f.private;
+      if (f.private) f.users = [S.me.id];   // privat: nur ich
       if (manage) {
         if (t) { var ru = await sb.from(T('tasks')).update(row).eq('id', id); if (ru.error) throw ru.error; }
         else { row.created_by = S.me.id; var ri = await sb.from(T('tasks')).insert(row).select('id'); if (ri.error) throw ri.error; id = ri.data[0].id; }
@@ -740,6 +750,10 @@
     if (!id) return false;
     f.list_id = id; return true;
   }
+  // Checkbox «Privat»: nur für die Ersteller/in (oder beim Anlegen); blendet «Favorit für» aus – ein privater Eintrag gehört nur mir
+  function privField(item, extra) {
+    return Object.assign({ name: 'private', label: L('privLabel'), type: 'checkbox', value: !!(item && item.is_private), hides: ['users'] }, extra || {});
+  }
   function lockIcon(l) { return l && l.is_private ? '<span class="lock" title="' + esc(L('shPrivTag')) + '">' + ICON.lock + '</span>' : ''; }
   function productById(id) { return S.products.filter(function (x) { return x.id === id; })[0] || null; }
   function myWish(pid) { return S.wishes.filter(function (w) { return w.product_id === pid && w.user_id === S.me.id; })[0] || null; }
@@ -778,7 +792,7 @@
     var star = '<button type="button" class="hico star' + (isFav ? ' on' : '') + '" data-act="' + (isFav ? 'need-unwish' : 'need-wish') + '" data-id="' + it.p.id + '" aria-pressed="' + isFav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button>';
     var menu = '<button type="button" class="hico" data-act="need-edit" data-id="' + it.p.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>';
     return '<li class="trow shopi' + ((fav ? it.w.checked : shop && bought) ? ' chk' : '') + '">' +
-      '<div class="l"><b>' + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
+      '<div class="l"><b>' + lockIcon(it.p) + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
       '<div class="btnrow">' + menu + star + '</div>' + (check || '<span class="tspace" aria-hidden="true"></span>') + '</li>';
   }
   function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
@@ -831,11 +845,11 @@
     name = String(name || '').trim();
     if (!name) return toast(L('shMissing'));
     var low = name.toLowerCase(), users = extra.users || [];
-    var prod = S.products.filter(function (p) { return p.name.trim().toLowerCase() === low; })[0];
+    var prod = S.products.filter(function (p) { return p.name.trim().toLowerCase() === low && !!p.is_private === !!extra.private; })[0];
     // gibt es das Produkt schon und niemand Neues wird Favorit, ist nichts zu tun
     if (prod && !users.some(function (u) { return !S.wishes.some(function (w) { return w.product_id === prod.id && w.user_id === u; }); })) return toast(L('shAlready'));
     return act(async function () {
-      var r = await sb.rpc(F('add_wish'), { p_name: name, p_note: extra.note || null, p_list: extra.list_id || null, p_users: users });
+      var r = await sb.rpc(F('add_product'), { p_name: name, p_note: extra.note || null, p_list: extra.list_id || null, p_users: extra.private ? [S.me.id] : users, p_private: !!extra.private });
       if (r.error) throw r.error;
     });
   }
@@ -852,6 +866,8 @@
     // Notiz und Liste gehören zum Favoriten; ist das Produkt noch kein Favorit, gelten sie für die neu gewählten Personen
     fields.push({ name: 'note', label: L('shNote'), value: w ? w.note : '', inline: true });
     fields.push(listField(w && w.list_id));
+    // «Privat»: nur die Person, die das Produkt angelegt hat – und nur solange niemand sonst es als Favorit führt
+    if (p.created_by === S.me.id && (p.is_private || !wishersOf(p.id).some(function (x) { return x.user_id !== S.me.id; }))) fields.push(privField(p));
     fields.push(favForField(p, w ? [S.me.id] : []));
     var fr = await askForm(L('shEditNeed'), fields, null, null, canRename(p) ? L('shProdDel') : null);   // «Produkt löschen» unten im Dialog
     if (!fr || fr.__extra) return fr;
@@ -928,7 +944,7 @@
     // Chronologisch: frühestes Event zuerst
     var evs = S.events.slice().sort(function (a, b) { return new Date(a.starts_at) - new Date(b.starts_at); });
     var evBody = evs.length ? '<ul class="list">' + evs.map(function (e) {
-      return '<li><div class="l"><b>' + esc(e.title) + (e.series_id ? ' <span class="small muted">&#8635;</span>' : '') + '</b><span>' + esc(evDayText(e) + (e.time_set === false ? '' : ' · ' + evTimeText(e))) + (e.place ? ' · ' + esc(e.place) : '') + '</span></div>' +
+      return '<li><div class="l"><b>' + lockIcon(e) + esc(e.title) + (e.series_id ? ' <span class="small muted">&#8635;</span>' : '') + '</b><span>' + esc(evDayText(e) + (e.time_set === false ? '' : ' · ' + evTimeText(e))) + (e.place ? ' · ' + esc(e.place) : '') + '</span></div>' +
         '<div class="btnrow"><button type="button" class="mini" data-act="ev-edit" data-id="' + e.id + '">' + esc(L('edit')) + '</button>' +
         '<button type="button" class="mini del" data-act="ev-del" data-id="' + e.id + '">' + esc(L('del')) + '</button></div></li>';
     }).join('') + '</ul>' : '<p class="muted">' + esc(L('evAdminEmpty')) + '</p>';
@@ -1069,7 +1085,7 @@
       var sid = sids[si], list = bySid[sid].sort(function (x, y) { return new Date(x.starts_at) - new Date(y.starts_at); });
       var lastEv = list[list.length - 1], r = lastEv.series_rule, last = new Date(lastEv.starts_at).getTime(), rows = [];
       genOccurrences(r.start, r.time, r.every, r.unit, r.wd, oneYear(), today()).forEach(function (iso) {
-        if (new Date(iso).getTime() > last) rows.push({ title: lastEv.title, place: lastEv.place, comment: lastEv.comment || null, rsvp: lastEv.rsvp, time_set: lastEv.time_set, starts_at: iso, ends_at: shiftEnd(lastEv.starts_at, lastEv.ends_at, iso), end_time_set: !!lastEv.end_time_set, category: lastEv.category || null, series_id: sid, series_open: true, series_rule: r });
+        if (new Date(iso).getTime() > last) rows.push({ is_private: !!lastEv.is_private, title: lastEv.title, place: lastEv.place, comment: lastEv.comment || null, rsvp: lastEv.rsvp, time_set: lastEv.time_set, starts_at: iso, ends_at: shiftEnd(lastEv.starts_at, lastEv.ends_at, iso), end_time_set: !!lastEv.end_time_set, category: lastEv.category || null, series_id: sid, series_open: true, series_rule: r });
       });
       if (!rows.length) continue;
       var res = await sb.from(T('events')).insert(rows).select('id');
@@ -1182,8 +1198,9 @@
       { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
       { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })), group: true },
       Object.assign(favPeopleField(haveEv, true), { group: true }),
+      (!ev || ev.created_by === S.me.id) ? privField(ev, { group: true }) : null,
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, group: true, half: true }
-    ];
+    ].filter(Boolean);
     // Änderungen optional auch für die folgenden Termine einer Serie übernehmen
     if (ev && ev.series_id && S.events.filter(function (x) { return x.series_id === ev.series_id; }).length > 1) fields.push({ name: 'follow', label: L('evFollow'), type: 'checkbox', value: true, group: true });
     // Bestehende Serie: Wiederholungsregel als Information anzeigen
@@ -1210,7 +1227,8 @@
     if (endDate === f.date && !f.end_time) endDate = '';
     var endsIso = endDate ? new Date(endDate + 'T' + (f.end_time || '00:00')).toISOString() : null;
     var row = { title: f.title, place: ev ? ev.place : null, comment: ev ? ev.comment : null, starts_at: new Date(f.date + 'T' + tm).toISOString(), ends_at: endsIso, end_time_set: !!(endsIso && f.end_time), category: f.category || null, rsvp: !!f.rsvp, time_set: hasTime };
-    var users = f.users || [];
+    var users = f.private ? [S.me.id] : (f.users || []);   // privat: nur ich
+    if (f.private !== undefined) row.is_private = !!f.private;
     // ersetzt die Zuteilung der angegebenen Events durch die gewählten Personen
     var setAssignees = async function (ids) {
       if (!ids.length) return;
@@ -1225,7 +1243,7 @@
       if (ev) occ = occ.filter(function (iso) { return new Date(iso) > new Date(row.starts_at); });   // der bearbeitete Termin ist der erste der Serie
       if (!occ.length) return toast(L('evNoOcc'));
       var sid = newSeriesId();
-      var rows = occ.map(function (iso) { return { title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: iso, ends_at: shiftEnd(row.starts_at, row.ends_at, iso), end_time_set: row.end_time_set, category: row.category, series_id: sid, series_open: true, series_rule: rule }; });
+      var rows = occ.map(function (iso) { return { is_private: !!row.is_private, title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: iso, ends_at: shiftEnd(row.starts_at, row.ends_at, iso), end_time_set: row.end_time_set, category: row.category, series_id: sid, series_open: true, series_rule: rule }; });
       return act(async function () {
         if (ev) { var u0 = await sb.from(T('events')).update(Object.assign({}, row, { series_id: sid, series_open: true, series_rule: rule })).eq('id', ev.id); if (u0.error) throw u0.error; }
         var r = await sb.from(T('events')).insert(rows).select('id'); if (r.error) throw r.error;
@@ -1243,7 +1261,7 @@
           var ups = await Promise.all(fol.map(function (x) {
             var nd = new Date(x.starts_at); nd.setDate(nd.getDate() + dayDelta);
             var nsIso = new Date(isoDate(nd) + 'T' + tm).toISOString();
-            return sb.from(T('events')).update({ title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: nsIso, ends_at: shiftEnd(row.starts_at, row.ends_at, nsIso), end_time_set: row.end_time_set, category: row.category }).eq('id', x.id);
+            return sb.from(T('events')).update({ is_private: !!(row.is_private != null ? row.is_private : ev.is_private), title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: nsIso, ends_at: shiftEnd(row.starts_at, row.ends_at, nsIso), end_time_set: row.end_time_set, category: row.category }).eq('id', x.id);
           }));
           ups.forEach(function (u) { if (u.error) throw u.error; });
           ids = ids.concat(fol.map(function (x) { return x.id; }));
@@ -1307,10 +1325,11 @@
           { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList'), inline: true },
           { name: 'note', label: L('shNote'), inline: true },
           listField(''),
+          privField(null),
           favForField(null, [S.me.id])
         ]);
         if (!nf || !(await resolveListChoice(nf))) return;
-        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users });
+        return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users, private: nf.private });
       }
       case 'ev-view': S.evView = v; return render();
       case 'ev-card': S.open['evc:' + id] = !S.open['evc:' + id]; return render();
@@ -1372,11 +1391,13 @@
           var newName = String(nfe.name == null ? ne.name : nfe.name).trim();
           if (!newName) throw new Error(L('shMissing'));
           if (newName !== ne.name) { var rn = await sb.from(T('products')).update({ name: newName }).eq('id', id); if (rn.error) throw rn.error; }
+          var isPriv = nfe.private !== undefined ? !!nfe.private : !!ne.is_private;
+          if (isPriv !== !!ne.is_private) { var rp = await sb.from(T('products')).update({ is_private: isPriv }).eq('id', id); if (rp.error) throw rp.error; }
           var had = {}; wishersOf(id).forEach(function (w) { had[w.user_id] = true; });
-          var sel = nfe.users || [], addU = sel.filter(function (u) { return !had[u]; });
+          var sel = isPriv ? [S.me.id] : (nfe.users || []), addU = sel.filter(function (u) { return !had[u]; });
           // Notiz/Liste angegeben, aber niemand gewählt und noch kein eigener Favorit: der Favorit wird für mich angelegt
           if (!had[S.me.id] && !addU.length && (nfe.note || nfe.list_id)) addU = [S.me.id];
-          if (addU.length) { var ra = await sb.rpc(F('add_wish'), { p_name: newName, p_note: nfe.note || null, p_list: nfe.list_id || null, p_users: addU }); if (ra.error) throw ra.error; }
+          if (addU.length) { var ra = await sb.rpc(F('add_product'), { p_name: newName, p_note: nfe.note || null, p_list: nfe.list_id || null, p_users: addU, p_private: isPriv }); if (ra.error) throw ra.error; }
           if (had[S.me.id] && sel.indexOf(S.me.id) < 0) {   // mich abgewählt: mein Favorit entfällt
             var rd = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (rd.error) throw rd.error;
           } else if (had[S.me.id]) {
