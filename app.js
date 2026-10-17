@@ -179,11 +179,14 @@
           else if (f.type === 'select') html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><select name="' + f.name + '">' + f.options.map(function (o) {
             return '<option value="' + esc(o.v) + '"' + (o.v === f.value ? ' selected' : '') + '>' + esc(o.l) + '</option>';
           }).join('') + '</select></label>';
-          else html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off"></label>' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '');
+          else html = '<label class="fld' + (f.inline ? ' inl' : '') + (f.label === '' ? ' nolbl' : '') + '"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off"></label>' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '');
           // aufeinanderfolgende Felder mit half:true stehen nebeneinander (z. B. Datum | Zeit)
           var prev = fields[i - 1], next = fields[i + 1];
           if (f.half && !(prev && prev.half)) html = '<div class="grid2">' + html;
           if (f.half && !(next && next.half)) html += '</div>';
+          // pair:true: zwei Felder in einer Zeile (Label links, z. B. «Bis | Datum | Zeit»)
+          if (f.pair && !(prev && prev.pair)) html = '<div class="dtrow">' + html;
+          if (f.pair && !(next && next.pair)) html += '</div>';
           return html;
         }).join('') +
         (extra ? '<button type="button" class="btn danger" data-x="extra">' + esc(extra) + '</button>' : '') + '<div class="row"><button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button><button class="btn" type="submit">' + esc(okLabel || L('save')) + '</button></div></form>';
@@ -1141,10 +1144,10 @@
     var fields = [
       { name: 'title', label: L('evTitle'), value: ev && ev.title, inline: true },
       { name: 'allday', label: L('evAllDay'), type: 'checkbox', value: !!ev && ev.time_set === false, hides: ['time', 'end_time'] },
-      { name: 'date', label: L('evDate'), type: 'date', value: local[0], half: true },
-      { name: 'time', label: L('evTime'), type: 'time', value: ev && ev.time_set === false ? '' : local[1], half: true },   // ganztägig: keine Zeit vorbelegen
-      { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], half: true },
-      { name: 'end_time', label: L('evEndTime'), type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', half: true },
+      { name: 'date', label: L('evDate'), type: 'date', value: local[0], inline: true },
+      { name: 'time', label: L('evTime'), type: 'time', value: ev && ev.time_set === false ? '' : local[1], inline: true },   // ganztägig: keine Zeit vorbelegen
+      { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: true },
+      { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: true },
       { name: 'place', label: L('evPlace'), value: ev && ev.place, inline: true },
       { name: 'comment', label: L('evComment'), type: 'textarea', value: ev && ev.comment, inline: true },
       { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })) },
