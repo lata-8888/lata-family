@@ -317,12 +317,23 @@ textarea[name]{width:100%;font-family:inherit;font-size:1rem;padding:10px 12px;b
 .ttad>span{display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--muted)}
 .ttc{border-left:1px solid var(--line);padding:2px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .ttc i{font-size:.58rem;color:var(--muted);text-align:center;font-style:normal}
-.ttchip{border:0;border-left:3px solid var(--crown);background:var(--crown-soft);color:var(--ink);font:inherit;font-size:.58rem;line-height:1.2;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
-.ttchip.fav,.ttb.fav{border-left-color:var(--warn)}
+.ttchip{position:relative;border:0;border-left:3px solid var(--c,var(--crown));background:color-mix(in srgb,var(--c,var(--crown)) 20%,var(--surface));color:var(--ink);font:inherit;font-size:.58rem;line-height:1.2;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
 .ttbody{display:grid;grid-template-columns:30px repeat(7,minmax(0,1fr));position:relative}
 .tth{position:relative}
 .tth b{position:absolute;right:3px;transform:translateY(-6px);font-size:.58rem;font-weight:400;color:var(--muted)}
 .ttcol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px);background-size:100% var(--hp)}
 .ttcol.sel{background-color:color-mix(in srgb,var(--crown) 8%,transparent)}
-.ttb{position:absolute;border:0;border-left:3px solid var(--crown);background:var(--crown-soft);color:var(--ink);font:inherit;font-size:.6rem;line-height:1.1;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;cursor:pointer;word-break:break-word}
+.ttb{position:absolute;border:0;border-left:3px solid var(--c,var(--crown));background:color-mix(in srgb,var(--c,var(--crown)) 20%,var(--surface));color:var(--ink);font:inherit;font-size:.6rem;line-height:1.1;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;cursor:pointer;word-break:break-word}
 .ttnow{position:absolute;left:0;right:0;height:2px;background:var(--no,#c0392b);pointer-events:none}
+
+.ttb.fav::after,.ttchip.fav::after{content:"\2605";position:absolute;right:1px;top:0;font-size:.55rem;line-height:1;color:var(--warn)}
+.ttleg{display:flex;flex-wrap:wrap;gap:4px 10px;margin:0 0 8px;font-size:.7rem;color:var(--muted)}
+.ttleg span{display:inline-flex;align-items:center;gap:4px}
+.ttleg i,.catopt i{width:10px;height:10px;border-radius:50%;background:var(--c);display:inline-block}
+.ccel.hascat{border-left:5px solid var(--c)}
+.catpick{display:flex;flex-wrap:wrap;gap:6px}
+.catopt{position:relative;display:inline-flex;align-items:center;gap:5px;padding:4px 10px 4px 8px;border:1.5px solid var(--line);border-radius:999px;cursor:pointer;font-size:.8rem;background:var(--surface)}
+.catopt input{position:absolute;opacity:0;pointer-events:none}
+.catopt em{font-style:normal}
+.catopt:has(input:checked){border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,var(--surface));font-weight:600}
+.catopt:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:1px}

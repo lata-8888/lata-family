@@ -32,6 +32,7 @@ create table if not exists public."lata-events" (
   starts_at timestamptz not null,
   ends_at timestamptz,                         -- optionales Ende (Datum; Endzeit nur wenn end_time_set)
   end_time_set boolean not null default false,
+  category text check (category is null or char_length(category) <= 20),   -- Farbe/Kategorie in der App (feste Liste)
   created_at timestamptz not null default now(),
   rsvp boolean not null default false,
   series_id uuid,
@@ -42,6 +43,7 @@ create table if not exists public."lata-events" (
 );
 alter table public."lata-events" add column if not exists ends_at timestamptz;
 alter table public."lata-events" add column if not exists end_time_set boolean not null default false;
+alter table public."lata-events" add column if not exists category text;
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'lata-events_ends_after_start') then
     alter table public."lata-events" add constraint "lata-events_ends_after_start" check (ends_at is null or ends_at >= starts_at);

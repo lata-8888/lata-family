@@ -1,6 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    evCategory: 'Kategorie', catNone: 'Keine', cat_family: 'Familie', cat_friends: 'Freunde', cat_sport: 'Sport', cat_school: 'Schule', cat_work: 'Arbeit', cat_leisure: 'Freizeit', cat_birthday: 'Geburtstag', cat_other: 'Sonstiges',
     taskMine: 'Meine Aufgaben',
     evEndDate: 'Enddatum', evEndTime: 'Endzeit', evFromTime: 'ab {t}', evUntilTime: 'bis {t}', evEndBefore: 'Das Ende liegt vor dem Start.', evEndNeedsStart: 'Für eine Endzeit braucht es eine Startzeit.',
     taskMore: 'Weitere Aufgaben',
@@ -59,6 +60,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    evCategory: 'Category', catNone: 'None', cat_family: 'Family', cat_friends: 'Friends', cat_sport: 'Sport', cat_school: 'School', cat_work: 'Work', cat_leisure: 'Leisure', cat_birthday: 'Birthday', cat_other: 'Other',
     taskMine: 'My tasks',
     evEndDate: 'End date', evEndTime: 'End time', evFromTime: 'from {t}', evUntilTime: 'until {t}', evEndBefore: 'The end is before the start.', evEndNeedsStart: 'An end time needs a start time.',
     taskMore: 'More tasks',
@@ -117,6 +119,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    evCategory: 'Categorie', catNone: 'Geen', cat_family: 'Familie', cat_friends: 'Vrienden', cat_sport: 'Sport', cat_school: 'School', cat_work: 'Werk', cat_leisure: 'Vrije tijd', cat_birthday: 'Verjaardag', cat_other: 'Overig',
     taskMine: 'Mijn taken',
     evEndDate: 'Einddatum', evEndTime: 'Eindtijd', evFromTime: 'vanaf {t}', evUntilTime: 'tot {t}', evEndBefore: 'Het einde ligt voor het begin.', evEndNeedsStart: 'Een eindtijd heeft een starttijd nodig.',
     taskMore: 'Overige taken',
