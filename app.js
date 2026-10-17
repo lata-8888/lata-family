@@ -635,8 +635,8 @@
   // «Favorit für» (Dropdown, 0–n Personen) für Events und Tasks: Verwalter (Ersteller/in, Admins, Event Manager) ändern alle;
   // alle anderen können Personen hinzufügen und sich selbst abwählen – wer schon Favorit ist, bleibt gesperrt (ausser ich selbst)
   var PCOLORS = ['#2a7bbf', '#8a55c8', '#1f9d6b', '#e07b12', '#c4488a', '#1aa3ad', '#6b7686', '#9c7248'];   // Farben der Personen-Felder
-  function favPeopleField(have, canManage, chips) {
-    return { name: 'users', label: L('shFavFor'), type: 'multi', dropdown: !chips, chips: !!chips,
+  function favPeopleField(have, canManage) {
+    return { name: 'users', label: L('shFavFor'), type: 'multi', chips: true,
       value: canManage ? have : (have.indexOf(S.me.id) > -1 ? [S.me.id] : []),
       options: memberOptions().map(function (o) { return { v: o.v, l: o.l, lock: !canManage && have.indexOf(o.v) > -1 && o.v !== S.me.id }; }) };
   }
@@ -822,7 +822,7 @@
   // «Favorit für»: andere Personen können hier dazukommen; wer das Produkt schon führt, kann nur selbst abwählen (Stern) – ausser mir
   function favForField(p, users) {
     var have = {}; if (p) wishersOf(p.id).forEach(function (w) { have[w.user_id] = true; });
-    return { name: 'users', label: L('shFavFor'), type: 'multi', dropdown: true, value: users,
+    return { name: 'users', label: L('shFavFor'), type: 'multi', chips: true, value: users,
       options: memberOptions().map(function (o) { return { v: o.v, l: o.l, lock: !!have[o.v] && o.v !== S.me.id }; }) };
   }
   function needEditForm(p) {
@@ -1127,7 +1127,7 @@
   }
   // Personen ohne Verwalterrechte (kein Admin/Event Manager) sehen nur «Favorit für»: Personen hinzufügen, sich selbst abwählen (bei Serien ab diesem Termin)
   async function eventFavForm(ev, have) {
-    var f = await askForm(L('evEdit'), [favPeopleField(have, false, true)]);
+    var f = await askForm(L('evEdit'), [favPeopleField(have, false)]);
     if (!f) return;
     var sel = f.users || [], add = sel.filter(function (u) { return have.indexOf(u) < 0; });
     var dropMe = have.indexOf(S.me.id) > -1 && sel.indexOf(S.me.id) < 0;
@@ -1158,7 +1158,7 @@
       { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: 2 },
       { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
       { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })), group: true },
-      Object.assign(favPeopleField(haveEv, true, true), { group: true }),
+      Object.assign(favPeopleField(haveEv, true), { group: true }),
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, group: true, half: true }
     ];
     // Änderungen optional auch für die folgenden Termine einer Serie übernehmen
