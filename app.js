@@ -187,6 +187,9 @@
           // pair:true: zwei Felder in einer Zeile (Label links, z. B. «Bis | Datum | Zeit»)
           if (f.pair && !(prev && prev.pair === f.pair)) html = '<div class="dtrow">' + html;
           if (f.pair && !(next && next.pair === f.pair)) html += '</div>';
+          // group:true: aufeinanderfolgende Felder in einem eingeklappten Dropdown «Details»
+          if (f.group && !(prev && prev.group)) html = '<details class="fgroup"><summary>' + esc(L('evDetails')) + '</summary>' + html;
+          if (f.group && !(next && next.group)) html += '</details>';
           return html;
         }).join('') +
         (extra ? '<button type="button" class="btn danger" data-x="extra">' + esc(extra) + '</button>' : '') + '<div class="row"><button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button><button class="btn" type="submit">' + esc(okLabel || L('save')) + '</button></div></form>';
@@ -1150,9 +1153,9 @@
       { name: 'time', label: '', type: 'time', value: ev && ev.time_set === false ? '' : local[1], inline: true, pair: 1 },   // ganztägig: keine Zeit vorbelegen
       { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: 2 },
       { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
-      { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })) },
-      favPeopleField(haveEv, true),
-      { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false }
+      { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })), group: true },
+      Object.assign(favPeopleField(haveEv, true), { group: true }),
+      { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, group: true }
     ];
     // Änderungen optional auch für die folgenden Termine einer Serie übernehmen
     if (ev && ev.series_id && S.events.filter(function (x) { return x.series_id === ev.series_id; }).length > 1) fields.push({ name: 'follow', label: L('evFollow'), type: 'checkbox', value: true });

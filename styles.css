@@ -36,6 +36,11 @@ p{margin:0}
 .fld.inl>.msel{width:100%}
 .fld.inl:has(.msel),.fld.inl:has(textarea){align-items:flex-start}
 .fld.inl:has(.msel)>span,.fld.inl:has(textarea)>span{padding-top:13px}
+.fgroup{margin:10px 0}
+.fgroup>summary{cursor:pointer;font-weight:700;padding:10px 0;list-style:none}
+.fgroup>summary::-webkit-details-marker{display:none}
+.fgroup>summary::after{content:'\25BE';margin-left:8px;display:inline-block;transition:transform .15s}
+.fgroup[open]>summary::after{transform:rotate(180deg)}
 .dtrow{display:flex;gap:10px;align-items:center}
 .dtrow>.fld.inl:first-child{flex:1;min-width:0}
 .dtrow>.fld.inl:last-child:not(:first-child){flex:0 0 7.5em;min-width:0}
