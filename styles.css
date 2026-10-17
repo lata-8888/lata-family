@@ -257,6 +257,9 @@ p{margin:0}
 .calday .cn{position:absolute;top:2px;right:4px;font-size:.68rem;color:var(--muted)}
 .calday.sel .cn{color:inherit}
 .calsel{margin-top:14px}
+.calday .cfav{position:absolute;top:2px;left:4px;line-height:0}
+.calday .cfav svg{width:11px;height:11px;fill:currentColor;stroke:none;color:var(--warn)}
+.cceh .hico.star{margin-left:4px}
 .calhint{margin-top:12px;text-align:center}
 .cceh .accfold{margin-left:auto}
 .cceh b + .hico,.cceh b + .accfold{margin-left:auto}

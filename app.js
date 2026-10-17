@@ -408,6 +408,7 @@
         '<div><h4>' + esc(L('evDeclined', { n: no.length })) + '</h4><div class="chips">' + pills(no) + '</div></div></div>' : '');
     return '<article class="ccel"><div class="cceh"><b>' + esc(fmtDay(e.starts_at)) + ' – ' + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
       (canManageEvents() ? '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.dots + '</button>' : '') +
+      '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button>' +
       '<button type="button" class="accfold' + (info ? ' open' : '') + '" data-act="ev-card" data-id="' + e.id + '" aria-expanded="' + info + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' +
       (infoHtml || rsvpHtml ? '<div class="ccbody">' + infoHtml + rsvpHtml + '</div>' : '') + '</article>';
   }
@@ -420,15 +421,13 @@
     var n = parseInt(v, 10);
     return isNaN(n) ? 3 : n;
   }
-  // Filter «Meine Events»: zeigt Events ohne Zuteilung und solche, denen ich zugeteilt bin (nur auf diesem Gerät gespeichert)
+  // Favorit eines Events = Eintrag in event_assignees (Person, Event). Filter oben rechts: nur meine Favoriten oder alles (nur auf diesem Gerät gespeichert)
+  function isFavEvent(id) { return S.assign.some(function (x) { return x.event_id === id && x.user_id === S.me.id; }); }
   function evFilterOn() {
     try { return localStorage.getItem('app-ev-filter' + SFX) === '1'; } catch (e) { return false; }
   }
   function agendaEvents() {
-    if (!evFilterOn()) return S.events;
-    var withAssignee = {}, mine = {};
-    S.assign.forEach(function (x) { withAssignee[x.event_id] = true; if (x.user_id === S.me.id) mine[x.event_id] = true; });
-    return S.events.filter(function (e) { return !withAssignee[e.id] || mine[e.id]; });
+    return evFilterOn() ? S.events.filter(function (e) { return isFavEvent(e.id); }) : S.events;
   }
   function monthLabel(iso) { return new Date(iso).toLocaleDateString(LOCALE[lang], { month: 'long', year: 'numeric' }); }
   // Events mit Monatsüberschrift gruppiert (wie in der FBRO-App)
@@ -441,34 +440,59 @@
     });
     return html;
   }
-  // Monatskalender: 7 Tage breit, 4–6 Wochen hoch; Tage mit Event zeigen ein Symbol, Antippen zeigt die Termine darunter
-  function viewCalendar() {
-    var now = new Date();
-    var base = S.calMonth ? new Date(S.calMonth) : new Date(now.getFullYear(), now.getMonth(), 1);
-    var y = base.getFullYear(), m = base.getMonth();
+  // Woche und Monat: Raster oben, darunter die Liste der Termine des Zeitraums (Tippen auf einen Tag zeigt nur dessen Termine)
+  function weekStart(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+  function isoWeek(d) {
+    var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())), n = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - n);
+    return Math.ceil(((t - new Date(Date.UTC(t.getUTCFullYear(), 0, 1))) / 86400000 + 1) / 7);
+  }
+  function calCell(key, dn, evs, sel, todayKey) {
+    var cls = 'calday' + (evs.length ? ' has' : '') + (key === todayKey ? ' today' : '') + (key === sel ? ' sel' : '');
+    if (!evs.length) return '<span class="' + cls + '"><span class="dn">' + dn + '</span></span>';
+    var fav = evs.some(function (e) { return isFavEvent(e.id); });
+    return '<button type="button" class="' + cls + '" data-act="cal-day" data-val="' + key + '" aria-pressed="' + (key === sel) + '"><span class="dn">' + dn + '</span>' + ICON.cal +
+      (evs.length > 1 ? '<span class="cn">' + evs.length + '</span>' : '') + (fav ? '<span class="cfav" aria-hidden="true">' + ICON.star + '</span>' : '') + '</button>';
+  }
+  function viewCalendar(mode) {
+    var now = new Date(), todayKey = isoDate(now), week = mode === 'week';
     var byDay = {};
     agendaEvents().forEach(function (e) { var k = isoDate(new Date(e.starts_at)); (byDay[k] = byDay[k] || []).push(e); });
-    var lead = (new Date(y, m, 1).getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate(), weeks = Math.ceil((lead + dim) / 7);
-    var todayKey = isoDate(now);
-    var sel = S.calDay && S.calDay.slice(0, 7) === isoDate(base).slice(0, 7) ? S.calDay : '';
+    var from, to, label, canNext, cells = '';
     var lastOk = new Date(now.getFullYear(), now.getMonth() + 12, 1);
-    var html = '<div class="calnav"><button type="button" class="hico" data-act="cal-prev" aria-label="' + esc(L('evPrevMonth')) + '">' + ICON.chev + '</button>' +
-      '<b>' + esc(base.toLocaleDateString(LOCALE[lang], { month: 'long', year: 'numeric' })) + '</b>' +
-      '<button type="button" class="hico" data-act="cal-next" aria-label="' + esc(L('evNextMonth')) + '"' + (new Date(y, m + 1, 1) > lastOk ? ' disabled' : '') + '>' + ICON.chev + '</button></div>';
+    if (week) {
+      from = S.calWeek ? new Date(S.calWeek) : weekStart(now);
+      to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 7);
+      var last = new Date(to.getFullYear(), to.getMonth(), to.getDate() - 1);
+      label = L('evWeekLabel', { n: isoWeek(from) }) + ' · ' + from.toLocaleDateString(LOCALE[lang], { day: 'numeric', month: 'short' }) + ' – ' + last.toLocaleDateString(LOCALE[lang], { day: 'numeric', month: 'short', year: 'numeric' });
+      canNext = to <= lastOk;
+    } else {
+      var base = S.calMonth ? new Date(S.calMonth) : new Date(now.getFullYear(), now.getMonth(), 1);
+      from = new Date(base.getFullYear(), base.getMonth(), 1); to = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+      label = base.toLocaleDateString(LOCALE[lang], { month: 'long', year: 'numeric' });
+      canNext = to <= lastOk;
+    }
+    var sel = S.calDay && S.calDay >= isoDate(from) && S.calDay < isoDate(to) ? S.calDay : '';
+    var html = '<div class="calnav"><button type="button" class="hico" data-act="cal-prev" aria-label="' + esc(L(week ? 'evPrevWeek' : 'evPrevMonth')) + '">' + ICON.chev + '</button>' +
+      '<b>' + esc(label) + '</b>' +
+      '<button type="button" class="hico" data-act="cal-next" aria-label="' + esc(L(week ? 'evNextWeek' : 'evNextMonth')) + '"' + (canNext ? '' : ' disabled') + '>' + ICON.chev + '</button></div>';
     html += '<div class="calgrid calwd">' + [1, 2, 3, 4, 5, 6, 7].map(function (d) { return '<span>' + esc(new Date(2024, 0, d).toLocaleDateString(LOCALE[lang], { weekday: 'short' })) + '</span>'; }).join('') + '</div>';
-    var cells = '';
-    for (var c = 0; c < weeks * 7; c++) {
-      var dn = c - lead + 1;
-      if (dn < 1 || dn > dim) { cells += '<span class="calday out"></span>'; continue; }
-      var key = isoDate(new Date(y, m, dn)), evs = byDay[key] || [];
-      var cls = 'calday' + (evs.length ? ' has' : '') + (key === todayKey ? ' today' : '') + (key === sel ? ' sel' : '');
-      cells += evs.length
-        ? '<button type="button" class="' + cls + '" data-act="cal-day" data-val="' + key + '" aria-pressed="' + (key === sel) + '"><span class="dn">' + dn + '</span>' + ICON.cal + (evs.length > 1 ? '<span class="cn">' + evs.length + '</span>' : '') + '</button>'
-        : '<span class="' + cls + '"><span class="dn">' + dn + '</span></span>';
+    if (week) {
+      for (var c = 0; c < 7; c++) { var d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + c), k = isoDate(d); cells += calCell(k, d.getDate(), byDay[k] || [], sel, todayKey); }
+    } else {
+      var y = from.getFullYear(), m = from.getMonth(), lead = (from.getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate(), weeks = Math.ceil((lead + dim) / 7);
+      for (var c2 = 0; c2 < weeks * 7; c2++) {
+        var dn = c2 - lead + 1;
+        if (dn < 1 || dn > dim) { cells += '<span class="calday out"></span>'; continue; }
+        var key = isoDate(new Date(y, m, dn)); cells += calCell(key, dn, byDay[key] || [], sel, todayKey);
+      }
     }
     html += '<div class="calgrid">' + cells + '</div>';
-    if (sel && byDay[sel]) html += '<div class="calsel">' + byDay[sel].map(eventCard).join('') + '</div>';
-    else html += '<p class="muted small calhint">' + esc(L('evCalHint')) + '</p>';
+    // Liste darunter: Termine des Zeitraums, oder nur des gewählten Tages
+    var f = sel || isoDate(from), t = sel ? null : isoDate(to);
+    var list = agendaEvents().filter(function (e) { var k = isoDate(new Date(e.starts_at)); return sel ? k === sel : (k >= f && k < t); }).sort(function (x, y) { return new Date(x.starts_at) - new Date(y.starts_at); });
+    html += '<p class="muted small calhint">' + esc(L('evCalHint')) + '</p>';
+    html += list.length ? '<div class="calsel">' + list.map(eventCard).join('') + '</div>' : '<div class="empty"><p>' + esc(L('evNoneInPeriod')) + '</p></div>';
     return html;
   }
   function viewEvents() {
@@ -487,11 +511,11 @@
       '<button type="button" class="hico addbtn" data-act="ev-horizon" aria-label="' + esc(L('evHorizonTitle')) + '" title="' + esc(L('evHorizonTitle')) + '">' + ICON.dots + '</button>' +
       '<button type="button" class="hico addbtn' + (evFilterOn() ? ' on' : '') + '" data-act="ev-filter" aria-pressed="' + evFilterOn() + '" aria-label="' + esc(L('evFilter')) + '" title="' + esc(L(evFilterOn() ? 'evFilterOnTip' : 'evFilter')) + '">' + ICON.filter + '</button>' +
       (canManageEvents() ? '<button type="button" class="hico addbtn" data-act="ev-new" aria-label="' + esc(L('evNew')) + '" title="' + esc(L('evNew')) + '">' + ICON.plus + '</button>' : '') + '</div>';
-    // zwei Register: Liste | Kalender
-    var evv = S.evView === 'cal' ? 'cal' : 'list';
+    // drei Register: Liste | Woche | Monat (Woche und Monat zeigen die Liste des Zeitraums unten)
+    var evv = S.evView === 'week' ? 'week' : (S.evView === 'month' || S.evView === 'cal') ? 'month' : 'list';
     var etab = function (v, label) { var on = v === evv; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="ev-view" data-val="' + v + '">' + esc(label) + '</button>'; };
-    html += '<div class="subtabs" role="tablist">' + etab('list', L('evTabList')) + etab('cal', L('evTabCal')) + '</div>';
-    if (evv === 'cal') return html + viewCalendar();
+    html += '<div class="subtabs" role="tablist">' + etab('list', L('evTabList')) + etab('week', L('evTabWeek')) + etab('month', L('evTabMonth')) + '</div>';
+    if (evv !== 'list') return html + viewCalendar(evv);
     if (near.length) html += monthList(near);
     else html += '<div class="empty"><p>' + esc(far.length ? L('evNoneInHorizon', { n: hz }) : L('evEmpty')) + '</p></div>';
     if (far.length) {
@@ -1106,12 +1130,27 @@
       }
       case 'ev-view': S.evView = v; return render();
       case 'ev-card': S.open['evc:' + id] = !S.open['evc:' + id]; return render();
-      case 'cal-day': S.calDay = v; return render();
+      case 'cal-day': S.calDay = S.calDay === v ? '' : v; return render();
       case 'cal-prev': case 'cal-next': {
-        var cb = S.calMonth ? new Date(S.calMonth) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-        S.calMonth = new Date(cb.getFullYear(), cb.getMonth() + (a === 'cal-next' ? 1 : -1), 1).getTime();
+        var dirn = a === 'cal-next' ? 1 : -1, nowd = new Date();
+        if (S.evView === 'week') { var wb = S.calWeek ? new Date(S.calWeek) : weekStart(nowd); S.calWeek = new Date(wb.getFullYear(), wb.getMonth(), wb.getDate() + 7 * dirn).getTime(); }
+        else { var cb = S.calMonth ? new Date(S.calMonth) : new Date(nowd.getFullYear(), nowd.getMonth(), 1); S.calMonth = new Date(cb.getFullYear(), cb.getMonth() + dirn, 1).getTime(); }
         S.calDay = '';
         return render();
+      }
+      case 'ev-fav': {
+        // Stern: Favorit setzen/entfernen; bei Serien ab diesem Termin für alle folgenden
+        if (!ev) return;
+        var wasFav = isFavEvent(ev.id), t0 = new Date(ev.starts_at).getTime();
+        var favIds = ev.series_id ? S.events.filter(function (x) { return x.series_id === ev.series_id && new Date(x.starts_at).getTime() >= t0; }).map(function (x) { return x.id; }) : [ev.id];
+        return act(async function () {
+          for (var i = 0; i < favIds.length; i += 100) {
+            var part = favIds.slice(i, i + 100), r;
+            r = wasFav ? await sb.from(T('event_assignees')).delete().in('event_id', part).eq('user_id', S.me.id)
+              : await sb.from(T('event_assignees')).upsert(part.map(function (eid) { return { event_id: eid, user_id: S.me.id }; }), { onConflict: 'event_id,user_id', ignoreDuplicates: true });
+            if (r.error) throw r.error;
+          }
+        });
       }
       case 'task-view': S.taskView = v; return render();
       case 'need-check': {

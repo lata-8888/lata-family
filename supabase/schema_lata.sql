@@ -460,6 +460,9 @@ create policy events_select on public."lata-events" for select to authenticated 
 create policy events_manage on public."lata-events" for all to authenticated using (public.lata_can_manage_events()) with check (public.lata_can_manage_events());
 create policy event_assignees_select on public."lata-event_assignees" for select to authenticated using (public.lata_is_user());
 create policy event_assignees_manage on public."lata-event_assignees" for all to authenticated using (public.lata_can_manage_events()) with check (public.lata_can_manage_events());
+-- Favorit eines Events: jede Person setzt und entfernt ihren eigenen Eintrag (Stern in der Agenda)
+create policy event_assignees_own_write on public."lata-event_assignees" for all to authenticated
+  using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
 create policy event_responses_select on public."lata-event_responses" for select to authenticated using (public.lata_is_user());
 create policy event_responses_own_write on public."lata-event_responses" for all to authenticated
   using (user_id = auth.uid() and public.lata_is_user()) with check (user_id = auth.uid() and public.lata_is_user());
