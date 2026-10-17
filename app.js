@@ -252,7 +252,9 @@
         };
         det.addEventListener('change', paintSel); paintSel();
       });
-      var first = form.querySelector('input'); if (first) first.focus();
+      // Dialog immer ganz oben zeigen: Fokus ohne Scrollen, Dialog und Seite auf Anfang
+      var first = form.querySelector('input'); if (first) first.focus({ preventScroll: true });
+      form.scrollTop = 0; window.scrollTo(0, 0);
     });
   }
   function askConfirm(title, message, danger) {
