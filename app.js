@@ -1045,10 +1045,34 @@
     var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : S.tab === 'tasks' ? viewTasks() : S.tab === 'shop' ? viewShop() : viewEvents();
     app.innerHTML = banner + '<div class="shell">' + body + '</div>';
     nav.hidden = false;
+    var bd = badges();
     nav.innerHTML = tabs.map(function (t) {
-      return '<button class="tab' + (t.id === S.tab ? ' on' : '') + '" data-act="goto" data-val="' + t.id + '" aria-current="' + (t.id === S.tab) + '">' + t.icon + '<span>' + esc(t.label) + '</span></button>';
+      var mark = '', hint = '';
+      if (t.id === 'events' && bd.events) { mark = '<i class="dot"></i>'; hint = L('badgeEvToday'); }
+      if (t.id === 'tasks' && bd.tasks) { mark = '<b class="cnt">' + (bd.tasks > 9 ? '9+' : bd.tasks) + '</b>'; hint = L('badgeTasks', { n: bd.tasks }); }
+      if (t.id === 'admin' && bd.admin) { mark = '<i class="dot"></i>'; hint = L('badgeAdmin'); }
+      return '<button class="tab' + (t.id === S.tab ? ' on' : '') + '" data-act="goto" data-val="' + t.id + '" aria-current="' + (t.id === S.tab) + '"' + (hint ? ' aria-label="' + esc(t.label + ': ' + hint) + '"' : '') + '><span class="tic">' + t.icon + mark + '</span><span>' + esc(t.label) + '</span></button>';
     }).join('');
+    setAppBadge(bd.total);
     open.forEach(function (k) { var d = document.querySelector('details.ccel[data-k="' + k + '"]'); if (d) d.open = true; });
+  }
+
+  // Hinweise in der Fussleiste: Punkt bei Agenda (heute ein Event), Zähler bei Tasks (meine offenen, heute fällig oder überfällig),
+  // Punkt bei Admin (jemand hat die PIN noch nicht geändert); Summe = Zahl am App-Symbol
+  function badges() {
+    var td = today(), b = { events: false, tasks: 0, admin: false, total: 0 };
+    b.events = S.events.some(function (e) { return evDays(e).indexOf(td) > -1; });
+    b.tasks = S.tasks.filter(function (t) { return !t.done && t.due_date && t.due_date <= td && isFavTask(t.id); }).length;
+    b.admin = canManageEvents() && S.me.is_admin && S.members.some(function (m) { return !m.pin_changed; });
+    b.total = (b.events ? 1 : 0) + b.tasks + (b.admin ? 1 : 0);
+    return b;
+  }
+  var lastAppBadge = -1;
+  function setAppBadge(n) {
+    if (n === lastAppBadge || !navigator.setAppBadge) return;
+    lastAppBadge = n;
+    var p = n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge && navigator.clearAppBadge();
+    if (p && p.catch) p.catch(function (e) { console.error(e); });
   }
 
   /* ---------- Ereignisse ---------- */
