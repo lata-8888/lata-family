@@ -299,6 +299,7 @@
     catch (e) { console.error(e); toast(errText(e)); return false; }
   }
   var ICON = {
+    calAdd: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/></svg>',
     cal: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
     user: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>',
     guest: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M2 21c0-4 3.5-7 8-7M17 14v6M14 17h6"/></svg>',
@@ -442,7 +443,46 @@
       '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button>' +
       '<button type="button" class="accfold' + (info ? ' open' : '') + '" data-act="ev-card" data-id="' + e.id + '" aria-expanded="' + info + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' +
-      (infoHtml || rsvpHtml ? '<div class="ccbody">' + infoHtml + rsvpHtml + '</div>' : '') + '</article>';
+      (infoHtml || rsvpHtml ? '<div class="ccbody">' + infoHtml + rsvpHtml + '</div>' : '') +
+      // aufgeklappt: weisser Fussbereich mit dem Kalender-Symbol rechts (Event als .ics in Outlook/Apple Kalender übernehmen)
+      (info ? '<div class="ccfoot"><button type="button" class="hico" data-act="ev-ics" data-id="' + e.id + '" aria-label="' + esc(L('evToCal')) + '" title="' + esc(L('evToCal')) + '">' + ICON.calAdd + '</button></div>' : '') + '</article>';
+  }
+  // Kalendereintrag (.ics, RFC 5545) für Outlook, Apple Kalender, Google …: ganztägig = Datum ohne Zeit, sonst UTC-Zeiten; ohne Ende eine Stunde
+  function icsEscape(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+  function icsFold(line) {   // Zeilen höchstens 75 Zeichen, Fortsetzung mit Leerzeichen
+    var out = [], s = line;
+    while (s.length > 75) { out.push(s.slice(0, 75)); s = ' ' + s.slice(75); }
+    out.push(s); return out.join('\r\n');
+  }
+  function icsFor(e) {
+    var p2 = function (n) { return String(n).padStart(2, '0'); };
+    var dDate = function (d) { return d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()); };
+    var dUtc = function (ms) { var d = new Date(ms); return d.getUTCFullYear() + p2(d.getUTCMonth() + 1) + p2(d.getUTCDate()) + 'T' + p2(d.getUTCHours()) + p2(d.getUTCMinutes()) + p2(d.getUTCSeconds()) + 'Z'; };
+    var st = new Date(e.starts_at), lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//lata-family//Family//DE', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
+      'UID:' + e.id + '@lata-family', 'DTSTAMP:' + dUtc(Date.now())];
+    if (e.time_set === false) {
+      var last = new Date(evLastDay(e) + 'T12:00:00');
+      lines.push('DTSTART;VALUE=DATE:' + dDate(st), 'DTEND;VALUE=DATE:' + dDate(new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1)));
+    } else {
+      lines.push('DTSTART:' + dUtc(st.getTime()), 'DTEND:' + dUtc(e.ends_at ? evEndMs(e) : st.getTime() + 3600000));
+    }
+    lines.push('SUMMARY:' + icsEscape(e.title));
+    if (e.place) lines.push('LOCATION:' + icsEscape(e.place));
+    if (e.comment) lines.push('DESCRIPTION:' + icsEscape(e.comment));
+    lines.push('END:VEVENT', 'END:VCALENDAR');
+    return lines.map(icsFold).join('\r\n') + '\r\n';
+  }
+  async function addToCalendar(e) {
+    var file = new File([icsFor(e)], (e.title.replace(/[^\w\-äöüÄÖÜéèàç ]+/g, '').trim().slice(0, 40) || 'event') + '.ics', { type: 'text/calendar' });
+    var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
+    // installierte App auf dem Handy: Teilen-Dialog (dort «Kalender»); sonst Datei laden – Outlook/Apple Kalender öffnen sie
+    if (standalone && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: e.title }); return; }
+      catch (err) { if (err && err.name === 'AbortError') return; console.error(err); }
+    }
+    var url = URL.createObjectURL(file), a = document.createElement('a');
+    a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
   }
   function fmtDay(iso) { return new Date(iso).toLocaleDateString(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
   // Kategorien der Events: feste Liste, je eine Farbe (events.category = id; leer = keine Kategorie)
@@ -1357,6 +1397,7 @@
       }
       case 'ev-view': S.evView = v; return render();
       case 'ev-card': S.open['evc:' + id] = !S.open['evc:' + id]; return render();
+      case 'ev-ics': if (ev) addToCalendar(ev).catch(function (err) { console.error(err); toast(errText(err)); }); return;
       case 'cal-day': S.calDay = S.calDay === v ? '' : v; return render();
       case 'cal-prev': case 'cal-next': {
         var dirn = a === 'cal-next' ? 1 : -1, nowd = new Date();

@@ -1,6 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    evToCal: 'Zum Kalender hinzufügen (Outlook, Apple Kalender)',
     badgeEvToday: 'Heute steht ein Event an', badgeTasks: '{n} offene Aufgabe(n) heute oder überfällig', badgeAdmin: 'Es gibt Personen, die ihre PIN noch nicht geändert haben',
     privLabel: 'Privat (nur für mich sichtbar)', privShared: 'Privat nicht möglich: andere Personen führen dieses Produkt als Favorit.',
     evAllDay: 'Ganztägig',
@@ -63,6 +64,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    evToCal: 'Add to calendar (Outlook, Apple Calendar)',
     badgeEvToday: 'An event is on today', badgeTasks: '{n} open task(s) due today or overdue', badgeAdmin: 'Some people have not changed their PIN yet',
     privLabel: 'Private (only visible to me)', privShared: 'Cannot be private: other people have this product as a favorite.',
     evAllDay: 'All day',
@@ -125,6 +127,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    evToCal: 'Aan agenda toevoegen (Outlook, Apple Agenda)',
     badgeEvToday: 'Vandaag staat er een event op de agenda', badgeTasks: '{n} open taak/taken vandaag of te laat', badgeAdmin: 'Sommige personen hebben hun pincode nog niet gewijzigd',
     privLabel: 'Privé (alleen voor mij zichtbaar)', privShared: 'Privé niet mogelijk: andere personen hebben dit product als favoriet.',
     evAllDay: 'Hele dag',

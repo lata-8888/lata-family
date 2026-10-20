@@ -79,6 +79,8 @@ p{margin:0}
 .acct{flex:1;min-width:0;text-align:left;background:none;border:0;padding:4px 0;font-family:var(--font-head);font-weight:700;font-size:1.35rem;color:var(--crown)}
 .acct .cnt{color:var(--muted);font-weight:500;font-size:1rem}
 .ccbody{padding:10px 12px 12px}
+.ccfoot{display:flex;justify-content:flex-end;padding:4px 8px 6px;background:var(--surface);border-top:1px solid var(--line)}
+.ccfoot .hico svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .accbody{padding:0 12px 10px}
 .accfold{width:34px;height:32px;border:0;background:none;color:var(--crown);padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;flex:0 0 auto}
 .accfold svg,.cntbtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
