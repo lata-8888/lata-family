@@ -452,31 +452,38 @@
     while (s.length > 75) { out.push(s.slice(0, 75)); s = ' ' + s.slice(75); }
     out.push(s); return out.join('\r\n');
   }
-  function icsFor(e) {
+  // Start/Ende für den Kalender: ganztägig = Datum (Ende exklusiv), sonst UTC-Zeit; ohne Ende eine Stunde
+  function icsTimes(e) {
     var p2 = function (n) { return String(n).padStart(2, '0'); };
     var dDate = function (d) { return d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()); };
     var dUtc = function (ms) { var d = new Date(ms); return d.getUTCFullYear() + p2(d.getUTCMonth() + 1) + p2(d.getUTCDate()) + 'T' + p2(d.getUTCHours()) + p2(d.getUTCMinutes()) + p2(d.getUTCSeconds()) + 'Z'; };
-    var st = new Date(e.starts_at), lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//lata-family//Family//DE', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
-      'UID:' + e.id + '@lata-family', 'DTSTAMP:' + dUtc(Date.now())];
-    if (e.time_set === false) {
-      var last = new Date(evLastDay(e) + 'T12:00:00');
-      lines.push('DTSTART;VALUE=DATE:' + dDate(st), 'DTEND;VALUE=DATE:' + dDate(new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1)));
-    } else {
-      lines.push('DTSTART:' + dUtc(st.getTime()), 'DTEND:' + dUtc(e.ends_at ? evEndMs(e) : st.getTime() + 3600000));
-    }
-    lines.push('SUMMARY:' + icsEscape(e.title));
+    var st = new Date(e.starts_at);
+    if (e.time_set === false) { var last = new Date(evLastDay(e) + 'T12:00:00'); return { s: dDate(st), e: dDate(new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1)), stamp: dUtc(Date.now()) }; }
+    return { s: dUtc(st.getTime()), e: dUtc(e.ends_at ? evEndMs(e) : st.getTime() + 3600000), stamp: dUtc(Date.now()) };
+  }
+  function icsFor(e) {
+    var tm = icsTimes(e), dt = function (k, v) { return /^\d{8}$/.test(v) ? k + ';VALUE=DATE:' + v : k + ':' + v; };
+    var lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//lata-family//Family//DE', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
+      'UID:' + e.id + '@lata-family', 'DTSTAMP:' + tm.stamp, dt('DTSTART', tm.s), dt('DTEND', tm.e), 'SUMMARY:' + icsEscape(e.title)];
     if (e.place) lines.push('LOCATION:' + icsEscape(e.place));
     if (e.comment) lines.push('DESCRIPTION:' + icsEscape(e.comment));
     lines.push('END:VEVENT', 'END:VCALENDAR');
     return lines.map(icsFold).join('\r\n') + '\r\n';
   }
+  // iPhone/iPad: Adresse der Edge-Function lata-ics (liefert text/calendar, Safari bietet «Zum Kalender hinzufügen» an)
+  function icsUrl(e) {
+    var tm = icsTimes(e), q = { t: e.title, s: tm.s, e: tm.e, u: e.id };
+    if (e.place) q.l = e.place;
+    if (e.comment) q.d = e.comment;
+    return cfg.SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/lata-ics?' + Object.keys(q).map(function (k) { return k + '=' + encodeURIComponent(q[k]); }).join('&');
+  }
   async function addToCalendar(e) {
     var file = new File([icsFor(e)], (e.title.replace(/[^\w\-äöüÄÖÜéèàç ]+/g, '').trim().slice(0, 40) || 'event') + '.ics', { type: 'text/calendar' });
-    // iPhone/iPad: Datei laden oder teilen führt nicht in den Kalender – ein data:-Link mit text/calendar öffnet dort direkt «Zum Kalender hinzufügen»
+    // iPhone/iPad: Datei laden oder teilen führt nicht in den Kalender – eine https-Adresse mit text/calendar öffnet dort «Zum Kalender hinzufügen»
     var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     if (ios) {
       var da = document.createElement('a');
-      da.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(icsFor(e)); da.target = '_blank'; da.rel = 'noopener';
+      da.href = icsUrl(e); da.target = '_blank'; da.rel = 'noopener';
       document.body.appendChild(da); da.click(); da.remove();
       return;
     }
