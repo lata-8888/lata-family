@@ -156,7 +156,7 @@
   function askForm(title, fields, okLabel, intro, extra, opts) {
     return new Promise(function (resolve) {
       var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
-      wrap.innerHTML = '<form class="ccsheet' + (opts && opts.compact ? ' compact' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><h3>' + esc(title) + '</h3>' +
+      wrap.innerHTML = '<form class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><h3>' + esc(title) + '</h3>' +
         (intro ? '<p class="muted">' + esc(intro) + '</p>' : '') +
         fields.map(function (f, i) {
           var html;
@@ -165,7 +165,7 @@
           else if (f.type === 'cat') html = '<div class="fld"><span>' + esc(f.label) + '</span><div class="catpick">' + f.options.map(function (o) {
             return '<label class="catopt" style="--c:' + o.c + '"><input type="radio" name="' + f.name + '" value="' + esc(o.v) + '"' + (o.v === (f.value || '') ? ' checked' : '') + '><i></i><em>' + esc(o.l) + '</em></label>';
           }).join('') + '</div></div>';
-          else if (f.type === 'textarea') html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><textarea name="' + f.name + '" rows="' + (f.inline ? 2 : 3) + '">' + esc(f.value || '') + '</textarea></label>';
+          else if (f.type === 'textarea') html = '<label class="fld' + (f.inline !== false ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><textarea name="' + f.name + '" rows="' + (f.inline ? 2 : 3) + '">' + esc(f.value || '') + '</textarea></label>';
           else if (f.type === 'multi' && f.chips) html = '<div class="fld"><span>' + esc(f.label) + '</span><div class="catpick">' + f.options.map(function (o, k) {
             return '<label class="catopt" style="--c:' + PCOLORS[k % PCOLORS.length] + '"><input type="checkbox" name="' + f.name + '" value="' + esc(o.v) + '"' + ((f.value || []).indexOf(o.v) > -1 || o.lock ? ' checked' : '') + (o.lock ? ' disabled' : '') + '><i></i><em>' + esc(o.l) + '</em></label>';
           }).join('') + '</div></div>';
@@ -178,11 +178,11 @@
               : '<div class="fld"><span>' + esc(f.label) + '</span>' + boxes + '</div>';
           }
           else if (f.type === 'note') html = '<p class="muted small recinfo">' + esc(f.text) + '</p>';
-          else if (f.type === 'phone') html = '<div class="fld"><span>' + esc(f.label) + '</span>' + phoneField(f.value) + '</div>';
-          else if (f.type === 'select') html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><select name="' + f.name + '">' + f.options.map(function (o) {
+          else if (f.type === 'phone') html = '<div class="fld inl"><span>' + esc(f.label) + '</span>' + phoneField(f.value) + '</div>';
+          else if (f.type === 'select') html = '<label class="fld' + (f.inline !== false ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><select name="' + f.name + '">' + f.options.map(function (o) {
             return '<option value="' + esc(o.v) + '"' + (o.v === f.value ? ' selected' : '') + '>' + esc(o.l) + '</option>';
           }).join('') + '</select></label>';
-          else html = '<label class="fld' + (f.inline ? ' inl' : '') + (f.label === '' ? ' nolbl' : '') + '"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '"' + (f.step ? ' step="' + f.step + '"' : '') + ' value="' + esc(f.value || '') + '" autocomplete="off"></label>' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '');
+          else html = '<label class="fld' + (f.inline !== false ? ' inl' : '') + (f.label === '' ? ' nolbl' : '') + '"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '"' + (f.step ? ' step="' + f.step + '"' : '') + ' value="' + esc(f.value || '') + '" autocomplete="off"></label>' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '');
           // aufeinanderfolgende Felder mit half:true stehen nebeneinander (z. B. Datum | Zeit)
           var prev = fields[i - 1], next = fields[i + 1];
           if (f.half && !(prev && prev.half)) html = '<div class="grid2">' + html;
@@ -312,6 +312,8 @@
     lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     tasks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/></svg>',
     filter: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>',
+    pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg>',
+    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>',
     dots: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
     chev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'
   };
@@ -778,7 +780,7 @@
   async function newListDialog() {
     var lf = await askForm(L('shNewList'), [
       { name: 'name', label: L('shListName') },
-      { name: 'is_private', label: L('shPrivate'), type: 'checkbox', value: false }
+      { name: 'is_private', label: L('privLabel'), type: 'checkbox', value: false }
     ]);
     if (!lf || !lf.name) return null;
     var r = await sb.from(T('shop_lists')).insert({ name: lf.name, owner_id: S.me.id, is_private: !!lf.is_private }).select('id').single();
@@ -956,8 +958,9 @@
       { name: 'month_day', label: L('recMonthDay'), type: 'number', value: String((r && r.month_day) || 1) },
       { name: 'start_date', label: L('recStart'), type: 'date', value: r ? r.start_date : today() },
       { name: 'note', label: L('taskNote'), value: r && r.note }
-    ]);
+    ], null, null, r ? L('del') : null);
     if (!f) return;
+    if (f.__extra) return doRecDel(r.id);
     var md = Math.min(28, Math.max(1, parseInt(f.month_day, 10) || 1));
     if (!f.title || !f.assigned_to || !f.start_date) return toast(L('recMissing'));
     var row = { title: f.title, note: f.note || null, assigned_to: f.assigned_to, freq: f.freq,
@@ -968,14 +971,18 @@
       if (q.error) throw q.error;
     }, L('saved'));
   }
+  async function doRecDel(id) {
+    var rd2 = S.rules.filter(function (x) { return x.id === id; })[0];
+    if (rd2 && await askConfirm(L('del'), L('recDeleteAsk', { title: rd2.title }), true))
+      return act(async function () { var r = await sb.from(T('recurring_tasks')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
+  }
   function recurBody() {
     var rows = S.rules.map(function (r) {
       return '<li class="trow' + (r.active ? '' : ' tdone') + '"><div class="l"><b>' + esc(r.title) + '</b>' +
         '<span>' + esc(recurText(r)) + ' · ' + esc(nameOf(r.assigned_to)) + '</span>' +
         '<span class="tnote">' + esc(r.active ? L('recNext', { date: fmtDue(r.next_due) }) : L('recPaused')) + '</span></div>' +
-        '<div class="btnrow"><button type="button" class="mini" data-act="rec-toggle" data-id="' + r.id + '">' + esc(r.active ? L('recPause') : L('recResume')) + '</button>' +
-        '<button type="button" class="mini" data-act="rec-edit" data-id="' + r.id + '">' + esc(L('edit')) + '</button>' +
-        '<button type="button" class="mini del" data-act="rec-del" data-id="' + r.id + '">' + esc(L('del')) + '</button></div></li>';
+        '<div class="btnrow"><button type="button" class="hico" data-act="rec-edit" data-id="' + r.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
+        '<button type="button" class="hico" data-act="rec-toggle" data-id="' + r.id + '" aria-pressed="' + !r.active + '" aria-label="' + esc(r.active ? L('recPause') : L('recResume')) + '" title="' + esc(r.active ? L('recPause') : L('recResume')) + '">' + (r.active ? ICON.pause : ICON.play) + '</button></div></li>';
     });
     return '<p class="muted small" style="margin-bottom:8px">' + esc(L('recHint')) + '</p>' + ulOf(rows, 'recEmpty');
   }
@@ -987,8 +994,8 @@
     var evs = S.events.slice().sort(function (a, b) { return new Date(a.starts_at) - new Date(b.starts_at); });
     var evBody = evs.length ? '<ul class="list">' + evs.map(function (e) {
       return '<li><div class="l"><b>' + lockIcon(e) + esc(e.title) + (e.series_id ? ' <span class="small muted">&#8635;</span>' : '') + '</b><span>' + esc(evDayText(e) + (e.time_set === false ? '' : ' · ' + evTimeText(e))) + (e.place ? ' · ' + esc(e.place) : '') + '</span></div>' +
-        '<div class="btnrow"><button type="button" class="mini" data-act="ev-edit" data-id="' + e.id + '">' + esc(L('edit')) + '</button>' +
-        '<button type="button" class="mini del" data-act="ev-del" data-id="' + e.id + '">' + esc(L('del')) + '</button></div></li>';
+        '<div class="btnrow"><button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
+        '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button></div></li>';
     }).join('') + '</ul>' : '<p class="muted">' + esc(L('evAdminEmpty')) + '</p>';
     html += accordion('events', L('adminEvents'), evs.length, evBody, 'ev-new', L('evNew'));
     if (!isAdmin()) return html;   // Event Manager sehen nur die Events
@@ -1299,7 +1306,6 @@
     // Wiederholung beim Anlegen oder bei einem Einzeltermin (Serie beginnt dann mit diesem Termin)
     if (!(ev && ev.series_id)) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false, half: true }); fields.push({ name: 'rec', type: 'recurrence' }); }
     var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null, {
-      compact: true,
       // Bis folgt Von (Datum, und Zeit +1 Stunde), solange es nicht von Hand geändert wurde
       setup: function (form) {
         var d = form.elements.date, t = form.elements.time, ed = form.elements.end_date, et = form.elements.end_time, pd = d.value, pt = t.value;
@@ -1524,12 +1530,6 @@
       case 'rec-toggle': {
         var rr = S.rules.filter(function (x) { return x.id === id; })[0]; if (!rr) return;
         return act(async function () { var r = await sb.from(T('recurring_tasks')).update({ active: !rr.active }).eq('id', id); if (r.error) throw r.error; });
-      }
-      case 'rec-del': {
-        var rd2 = S.rules.filter(function (x) { return x.id === id; })[0];
-        if (rd2 && await askConfirm(L('del'), L('recDeleteAsk', { title: rd2.title }), true))
-          return act(async function () { var r = await sb.from(T('recurring_tasks')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
-        return;
       }
       case 'task-new': return taskForm(null);
       case 'task-edit': return taskForm(S.tasks.filter(function (x) { return x.id === id; })[0]);

@@ -1,5 +1,7 @@
 # Konsistenz-Prüfung Fenster und Dialoge
 
+**Umgesetzt in v75:** A1 (Labels links), A2 (alle Dialoge kompakt), A4 (Wortlaut «Privat (nur für mich sichtbar)»), A6 (Lösch-Knopf heisst überall «Entfernen»), B1 (Aufgabe → Task), C2 (Admin-Listen: Stift und Stern, ohne Text). Alle übrigen Punkte sind noch offen.
+
 Stand: App v74, geprüft anhand von Bildschirmfotos aller Dialoge und Hauptansichten sowie des Quelltexts.
 Dies ist eine **Bestandsaufnahme ohne Änderungen**. Jeder Punkt nennt, was heute unterschiedlich ist, und einen Vorschlag für den einheitlichen Zustand.
 

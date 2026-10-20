@@ -41,6 +41,7 @@ p{margin:0}
 .dtrow>.fld.inl:last-child:not(:first-child){flex:0 0 7.5em;min-width:0}
 .fld.inl.nolbl>span{display:none}
 .dtrow input{padding-left:10px;padding-right:8px;font-size:15px}
+.fld.inl>.phonerow{flex:1;min-width:0}
 .fld.inl>textarea{flex:1;min-width:0;width:auto}
 .fld + .suggbox{margin:-8px 0 16px}
 .msel>summary{list-style:none;cursor:pointer;display:block;padding:12px 38px 12px 14px;border-radius:var(--r-btn);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
@@ -112,8 +113,6 @@ p{margin:0}
 .list .l b{display:block;overflow-wrap:anywhere}
 .list .l span{color:var(--muted);font-size:.9rem}
 .btnrow{display:flex;gap:6px;flex-wrap:wrap}
-.mini{padding:7px 12px;border-radius:8px;border:1.5px solid var(--line);background:transparent;font-weight:600;font-size:.875rem;white-space:nowrap}
-.mini.del{color:var(--no);border-color:color-mix(in srgb,var(--no) 45%,var(--line))}
 .list li.mbrow{flex-wrap:nowrap;gap:8px}
 .mbrow .l{flex:1 1 auto}
 .pinlamp{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-bottom:2px}
@@ -147,22 +146,22 @@ p{margin:0}
 .ccsheet{width:100%;max-width:520px;background:var(--surface);border-radius:0 0 20px 20px;padding:calc(16px + env(safe-area-inset-top)) 18px 18px;max-height:100vh;max-height:100dvh;overflow:auto;overscroll-behavior:contain}
 .ccsheet h3{margin-bottom:8px}
 .ccsheet .btn.extra{margin-top:10px}
-.ccsheet.compact{padding:calc(10px + env(safe-area-inset-top)) 14px 12px}
-.ccsheet.compact h3{margin-bottom:6px;font-size:1.15rem}
-.ccsheet.compact .fld{margin-bottom:8px}
-.ccsheet.compact .fld>span{margin-bottom:3px;font-size:.9rem}
-.ccsheet.compact .fld input,.ccsheet.compact .fld select{padding:7px 10px;font-size:1rem}
-.ccsheet.compact .fld.inl>span{flex-basis:4.2em}
-.ccsheet.compact .check{margin-bottom:8px;gap:8px;font-size:.9rem}
-.ccsheet.compact .check input{width:20px;height:20px}
-.ccsheet.compact .grid2{gap:8px}
-.ccsheet.compact .dtrow{gap:8px}
-.ccsheet.compact .dtrow>.fld.inl:last-child:not(:first-child){flex-basis:7.4em}
-.ccsheet.compact .catpick{gap:4px}
-.ccsheet.compact .catopt{padding:2px 8px 2px 6px;font-size:.78rem}
-.ccsheet.compact .row{margin-top:4px}
-.ccsheet.compact .btn{padding:10px 14px}
-.ccsheet.compact .btn.extra{margin-top:8px}
+.ccsheet{padding:calc(10px + env(safe-area-inset-top)) 14px 12px}
+.ccsheet h3{margin-bottom:6px;font-size:1.15rem}
+.ccsheet .fld{margin-bottom:8px}
+.ccsheet .fld>span{margin-bottom:3px;font-size:.9rem}
+.ccsheet .fld input,.ccsheet .fld select{padding:7px 10px;font-size:1rem}
+.ccsheet .fld.inl>span{flex-basis:6.2em}
+.ccsheet .check{margin-bottom:8px;gap:8px;font-size:.9rem}
+.ccsheet .check input{width:20px;height:20px}
+.ccsheet .grid2{gap:8px}
+.ccsheet .dtrow{gap:8px}
+.ccsheet .dtrow>.fld.inl:last-child:not(:first-child){flex-basis:7.4em}
+.ccsheet .catpick{gap:4px}
+.ccsheet .catopt{padding:2px 8px 2px 6px;font-size:.78rem}
+.ccsheet .row{margin-top:4px}
+.ccsheet .btn{padding:10px 14px}
+.ccsheet .btn.extra{margin-top:8px}
 .ccsheet p{margin-bottom:12px}
 .ccsheet .row{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
 .ccsheet .row .btn{width:auto;flex:1}
