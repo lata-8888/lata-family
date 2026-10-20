@@ -190,9 +190,6 @@
           // pair:true: zwei Felder in einer Zeile (Label links, z. B. «Bis | Datum | Zeit»)
           if (f.pair && !(prev && prev.pair === f.pair)) html = '<div class="dtrow">' + html;
           if (f.pair && !(next && next.pair === f.pair)) html += '</div>';
-          // group:true: aufeinanderfolgende Felder in einem eingeklappten Dropdown «Details»
-          if (f.group && !(prev && prev.group)) html = '<details class="fgroup"><summary>' + esc(L('evDetails')) + '</summary>' + html;
-          if (f.group && !(next && next.group)) html += '</details>';
           return html;
         }).join('') +
         (extra ? '<button type="button" class="btn danger" data-x="extra">' + esc(extra) + '</button>' : '') + '<div class="row"><button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button><button class="btn" type="submit">' + esc(okLabel || L('save')) + '</button></div></form>';
@@ -431,8 +428,9 @@
     var btn = function (v, cls, label) { return '<button type="button" class="resp ' + cls + '" data-act="answer" data-id="' + e.id + '" data-val="' + v + '" aria-pressed="' + !!(mine && mine.answer === v) + '">' + esc(label) + '</button>'; };
     var info = !!S.open['evc:' + e.id];
     var asg = S.assign.filter(function (x) { return x.event_id === e.id; });   // Zeit und Ort: standardmässig eingeklappt
-    var infoHtml = info ? '<div class="evline"><span class="muted small">' + esc(evTimeText(e)) + (e.place ? ' · ' + esc(e.place) : '') + '</span>' +
-      (asg.length ? '<span class="chips">' + pills(asg) + '</span>' : '') + '</div>' +
+    var calBtn = '<button type="button" class="hico calbtn" data-act="ev-ics" data-id="' + e.id + '" aria-label="' + esc(L('evToCal')) + '" title="' + esc(L('evToCal')) + '">' + ICON.calAdd + '</button>';   // Kalender-Symbol rechts auf der Zeile mit Zeit und Favoriten
+    var infoHtml = info ? '<div class="evline"><span class="muted small">' + esc(evTimeText(e)) + '</span>' +
+      (asg.length ? '<span class="chips">' + pills(asg) + '</span>' : '') + calBtn + '</div>' +
       (e.comment ? '<p class="evcomment">' + esc(e.comment) + '</p>' : '') : '';    // Antwort-Knöpfe nur, wenn für das Event eine Teilnahme nötig ist (rsvp)
     var rsvpHtml = e.rsvp === false ? '' :
       '<div class="actrow">' + btn('yes', 'yes', L('evYes')) + btn('no', 'no', L('evNo')) +
@@ -443,9 +441,7 @@
       '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button>' +
       '<button type="button" class="accfold' + (info ? ' open' : '') + '" data-act="ev-card" data-id="' + e.id + '" aria-expanded="' + info + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' +
-      (infoHtml || rsvpHtml ? '<div class="ccbody">' + infoHtml + rsvpHtml + '</div>' : '') +
-      // aufgeklappt: weisser Fussbereich mit dem Kalender-Symbol rechts (Event als .ics in Outlook/Apple Kalender übernehmen)
-      (info ? '<div class="ccfoot"><button type="button" class="hico" data-act="ev-ics" data-id="' + e.id + '" aria-label="' + esc(L('evToCal')) + '" title="' + esc(L('evToCal')) + '">' + ICON.calAdd + '</button></div>' : '') + '</article>';
+      (infoHtml || rsvpHtml ? '<div class="ccbody">' + infoHtml + rsvpHtml + '</div>' : '') + '</article>';
   }
   // Kalendereintrag (.ics, RFC 5545) für Outlook, Apple Kalender, Google …: ganztägig = Datum ohne Zeit, sonst UTC-Zeiten; ohne Ende eine Stunde
   function icsEscape(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
@@ -1268,24 +1264,24 @@
       { name: 'time', label: '', type: 'time', value: ev && ev.time_set === false ? '' : local[1], inline: true, pair: 1 },   // ganztägig: keine Zeit vorbelegen
       { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: 2 },
       { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
-      { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })), group: true },
-      Object.assign(favPeopleField(haveEv, true), { group: true }),
-      (!ev || ev.created_by === S.me.id) ? privField(ev, { group: true }) : null,
-      { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, group: true, half: true }
+      favPeopleField(haveEv, true),
+      { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })) },
+      (!ev || ev.created_by === S.me.id) ? privField(ev) : null,
+      { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, half: true },
     ].filter(Boolean);
     // Änderungen optional auch für die folgenden Termine einer Serie übernehmen
-    if (ev && ev.series_id && S.events.filter(function (x) { return x.series_id === ev.series_id; }).length > 1) fields.push({ name: 'follow', label: L('evFollow'), type: 'checkbox', value: true, group: true });
+    if (ev && ev.series_id && S.events.filter(function (x) { return x.series_id === ev.series_id; }).length > 1) fields.push({ name: 'follow', label: L('evFollow'), type: 'checkbox', value: true });
     // Bestehende Serie: Wiederholungsregel als Information anzeigen
     if (ev && ev.series_id) {
       var cnt = S.events.filter(function (x) { return x.series_id === ev.series_id; }).length, r0 = ev.series_rule;
       var unitKey = r0 ? { day: 'evUnitDay', week: 'evUnitWeek', month: 'evUnitMonth', year: 'evUnitYear' }[r0.unit] : '';
       var dayTxt = r0 && r0.unit === 'week' ? ', ' + new Date(2024, 0, (r0.wd && r0.wd.length ? r0.wd[0] : ((new Date(r0.start + 'T12:00:00').getDay() + 6) % 7) + 1)).toLocaleDateString(LOCALE[lang], { weekday: 'long' }) : '';
-      fields.push({ type: 'note', group: true, text: r0 && unitKey
+      fields.push({ type: 'note', text: r0 && unitKey
         ? L('evSeriesInfo', { n: r0.every, unit: L(unitKey), day: dayTxt, count: cnt }) + (ev.series_open ? ' · ' + L('evSeriesOpen') : '')
         : L('evSeriesPlain', { count: cnt }) });
     }
     // Wiederholung beim Anlegen oder bei einem Einzeltermin (Serie beginnt dann mit diesem Termin)
-    if (!(ev && ev.series_id)) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false, group: true, half: true }); fields.push({ name: 'rec', type: 'recurrence', group: true }); }
+    if (!(ev && ev.series_id)) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false, half: true }); fields.push({ name: 'rec', type: 'recurrence' }); }
     var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null);
     if (!f) return;
     if (f.__extra) return deleteEvent(ev);
