@@ -182,7 +182,7 @@
           else if (f.type === 'select') html = '<label class="fld' + (f.inline ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><select name="' + f.name + '">' + f.options.map(function (o) {
             return '<option value="' + esc(o.v) + '"' + (o.v === f.value ? ' selected' : '') + '>' + esc(o.l) + '</option>';
           }).join('') + '</select></label>';
-          else html = '<label class="fld' + (f.inline ? ' inl' : '') + (f.label === '' ? ' nolbl' : '') + '"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '" value="' + esc(f.value || '') + '" autocomplete="off"></label>' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '');
+          else html = '<label class="fld' + (f.inline ? ' inl' : '') + (f.label === '' ? ' nolbl' : '') + '"><span>' + esc(f.label) + '</span><input name="' + f.name + '" type="' + (f.type || 'text') + '"' + (f.step ? ' step="' + f.step + '"' : '') + ' value="' + esc(f.value || '') + '" autocomplete="off"></label>' + (f.suggest ? '<div class="suggbox" data-for="' + f.name + '"></div>' : '');
           // aufeinanderfolgende Felder mit half:true stehen nebeneinander (z. B. Datum | Zeit)
           var prev = fields[i - 1], next = fields[i + 1];
           if (f.half && !(prev && prev.half)) html = '<div class="grid2">' + html;
@@ -252,6 +252,7 @@
         };
         cb.addEventListener('change', apply); apply();
       });
+      if (opts && opts.setup) opts.setup(form);
       // Dropdown-Mehrfachauswahl: Kopfzeile zeigt die gewählten Namen
       fields.forEach(function (f) {
         if (f.type !== 'multi' || !f.dropdown) return;
@@ -1241,19 +1242,38 @@
       }
     }, L('saved'));
   }
-  async function eventForm(ev) {
+  // Vorgabe-Datum für ein neues Event: aus dem Kalender der gewählte Tag (sonst der erste Tag des gezeigten Zeitraums, falls heute nicht darin liegt), sonst heute
+  function newEventDay() {
+    var td = today(), now = new Date();
+    if (S.evView !== 'week' && S.evView !== 'month' && S.evView !== 'cal') return td;
+    if (S.calDay) return S.calDay;
+    if (S.evView === 'week') {
+      var from = S.calWeek ? new Date(S.calWeek) : weekStart(now), to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 7);
+      return td >= isoDate(from) && td < isoDate(to) ? td : isoDate(from);
+    }
+    var first = isoDate(S.calMonth ? new Date(S.calMonth) : new Date(now.getFullYear(), now.getMonth(), 1));
+    return td.slice(0, 7) === first.slice(0, 7) ? td : first;
+  }
+  function hhmm(min) { min = Math.max(0, Math.min(1439, min)); return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0'); }
+  function toMin(t) { var p = (t || '').split(':'); return p.length > 1 ? (+p[0]) * 60 + (+p[1]) : -1; }
+  async function eventForm(ev, defDay) {
     var haveEv = ev ? S.assign.filter(function (x) { return x.event_id === ev.id; }).map(function (x) { return x.user_id; }) : [];
     if (ev && !canManageEvents()) return eventFavForm(ev, haveEv);
     // Wie in der FBRO-App: Titel, Datum und Uhrzeit getrennt (Datum | Zeit nebeneinander), Ort; Labels links
     var local = ev ? toLocalInput(ev.starts_at).split('T') : ['', ''];
     var endLocal = ev && ev.ends_at ? toLocalInput(ev.ends_at).split('T') : ['', ''];
+    var defStart = '', defEnd = '';
+    if (!ev) {   // Vorgaben: Datum wie gewählt (sonst heute), Bis = Von; Zeit in halben Stunden, Dauer 1 Stunde (heute: nächste halbe Stunde, sonst 09:00)
+      var dnow = new Date(), sm = defDay && defDay !== today() ? 9 * 60 : Math.min(Math.ceil((dnow.getHours() * 60 + dnow.getMinutes()) / 30) * 30, 22 * 60 + 30);
+      defStart = hhmm(sm); defEnd = hhmm(sm + 60); local = [defDay || today(), defStart]; endLocal = [local[0], defEnd];
+    }
     var fields = [
       { name: 'title', label: L('evTitle'), value: ev && ev.title, inline: true },
       { name: 'allday', label: L('evAllDay'), type: 'checkbox', value: !!ev && ev.time_set === false, hides: ['time', 'end_time'] },
       { name: 'date', label: L('evTime'), type: 'date', value: local[0], inline: true, pair: 1 },
-      { name: 'time', label: '', type: 'time', value: ev && ev.time_set === false ? '' : local[1], inline: true, pair: 1 },   // ganztägig: keine Zeit vorbelegen
-      { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: 2 },
-      { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
+      { name: 'time', label: '', type: 'time', value: ev && ev.time_set === false ? '' : local[1], step: 1800, inline: true, pair: 1 },   // ganztägig: keine Zeit vorbelegen
+      { name: 'end_date', label: L('evEndDate'), type: 'date', value: ev ? endLocal[0] : local[0], inline: true, pair: 2 },
+      { name: 'end_time', label: '', type: 'time', value: ev ? (ev.end_time_set ? endLocal[1] : '') : defEnd, step: 1800, inline: true, pair: 2 },
       favPeopleField(haveEv, true),
       (!ev || ev.created_by === S.me.id) ? privField(ev) : null,
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, half: true },
@@ -1271,7 +1291,19 @@
     }
     // Wiederholung beim Anlegen oder bei einem Einzeltermin (Serie beginnt dann mit diesem Termin)
     if (!(ev && ev.series_id)) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false, half: true }); fields.push({ name: 'rec', type: 'recurrence' }); }
-    var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null, { compact: true });
+    var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null, {
+      compact: true,
+      // Bis folgt Von (Datum, und Zeit +1 Stunde), solange es nicht von Hand geändert wurde
+      setup: function (form) {
+        var d = form.elements.date, t = form.elements.time, ed = form.elements.end_date, et = form.elements.end_time, pd = d.value, pt = t.value;
+        d.addEventListener('change', function () { if (!ed.value || ed.value === pd || ed.value < d.value) ed.value = d.value; pd = d.value; });
+        t.addEventListener('change', function () {
+          var m = toMin(t.value);
+          if (m >= 0 && (!et.value || toMin(et.value) === toMin(pt) + 60)) et.value = hhmm(m + 60);
+          pt = t.value;
+        });
+      }
+    });
     if (!f) return;
     if (f.__extra) return deleteEvent(ev);
     if (!f.title || !f.date) return toast(L('evMissing'));
@@ -1559,7 +1591,7 @@
       case 'ev-filter':
         try { localStorage.setItem('app-ev-filter' + SFX, evFilterOn() ? '0' : '1'); } catch (e3) { /* ignorieren */ }
         return render();
-      case 'ev-new': return eventForm(null);
+      case 'ev-new': return eventForm(null, newEventDay());
       case 'ev-edit': return eventForm(ev);
       case 'ev-del': return deleteEvent(ev);
       case 'admin': return rpc('set_admin', { target: id, make_admin: v === 'true' }, L('saved'));
