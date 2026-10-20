@@ -474,8 +474,16 @@
   }
   async function addToCalendar(e) {
     var file = new File([icsFor(e)], (e.title.replace(/[^\w\-äöüÄÖÜéèàç ]+/g, '').trim().slice(0, 40) || 'event') + '.ics', { type: 'text/calendar' });
+    // iPhone/iPad: Datei laden oder teilen führt nicht in den Kalender – ein data:-Link mit text/calendar öffnet dort direkt «Zum Kalender hinzufügen»
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (ios) {
+      var da = document.createElement('a');
+      da.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(icsFor(e)); da.target = '_blank'; da.rel = 'noopener';
+      document.body.appendChild(da); da.click(); da.remove();
+      return;
+    }
+    // Android-App: Teilen-Dialog (dort «Kalender»); sonst Datei laden – Outlook/Apple Kalender öffnen sie
     var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
-    // installierte App auf dem Handy: Teilen-Dialog (dort «Kalender»); sonst Datei laden – Outlook/Apple Kalender öffnen sie
     if (standalone && navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: e.title }); return; }
       catch (err) { if (err && err.name === 'AbortError') return; console.error(err); }
