@@ -153,10 +153,10 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('show'); }, 3200);
   }
   // Bottom-Sheet mit Formular → Promise(Werte | null)
-  function askForm(title, fields, okLabel, intro, extra) {
+  function askForm(title, fields, okLabel, intro, extra, opts) {
     return new Promise(function (resolve) {
       var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
-      wrap.innerHTML = '<form class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><h3>' + esc(title) + '</h3>' +
+      wrap.innerHTML = '<form class="ccsheet' + (opts && opts.compact ? ' compact' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><h3>' + esc(title) + '</h3>' +
         (intro ? '<p class="muted">' + esc(intro) + '</p>' : '') +
         fields.map(function (f, i) {
           var html;
@@ -192,7 +192,8 @@
           if (f.pair && !(next && next.pair === f.pair)) html += '</div>';
           return html;
         }).join('') +
-        (extra ? '<button type="button" class="btn danger" data-x="extra">' + esc(extra) + '</button>' : '') + '<div class="row"><button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button><button class="btn" type="submit">' + esc(okLabel || L('save')) + '</button></div></form>';
+        '<div class="row"><button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button><button class="btn" type="submit">' + esc(okLabel || L('save')) + '</button></div>' +
+        (extra ? '<button type="button" class="btn danger extra" data-x="extra">' + esc(extra) + '</button>' : '') + '</form>';   // «Löschen» ganz unten
       document.body.appendChild(wrap);
       var form = wrap.querySelector('form'), close = function (v) { wrap.remove(); resolve(v); };
       wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.dataset.x === 'cancel') close(null); else if (e.target.dataset.x === 'extra') close({ __extra: true }); });
@@ -1282,7 +1283,7 @@
     }
     // Wiederholung beim Anlegen oder bei einem Einzeltermin (Serie beginnt dann mit diesem Termin)
     if (!(ev && ev.series_id)) { fields.push({ name: 'repeat', label: L('evRepeat'), type: 'checkbox', value: false, half: true }); fields.push({ name: 'rec', type: 'recurrence' }); }
-    var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null);
+    var f = await askForm(ev ? L('evEdit') : L('evNew'), fields, null, null, ev ? L('del') : null, { compact: true });
     if (!f) return;
     if (f.__extra) return deleteEvent(ev);
     if (!f.title || !f.date) return toast(L('evMissing'));
