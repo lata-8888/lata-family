@@ -438,7 +438,7 @@
       '<button type="button" class="resp cntbtn' + (open ? ' is-open' : '') + '" data-act="who" data-id="' + e.id + '" aria-expanded="' + open + '"><b>' + yes.length + '</b>' + ICON.chev + '</button></div>' +
       (open ? '<div class="who"><div><h4>' + esc(L('evParticipants', { n: yes.length })) + '</h4><div class="chips">' + pills(yes) + '</div></div>' +
         '<div><h4>' + esc(L('evDeclined', { n: no.length })) + '</h4><div class="chips">' + pills(no) + '</div></div></div>' : '');
-    return '<article class="ccel' + (catOf(e) ? ' hascat' : '') + '"' + (catOf(e) ? ' style="--c:' + catColor(e) + '"' : '') + '><div class="cceh"><b>' + esc(evDayText(e)) + ' – ' + lockIcon(e) + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
+    return '<article class="ccel"><div class="cceh"><b>' + esc(evDayText(e)) + ' – ' + lockIcon(e) + esc(e.title) + (e.series_id ? ' <span class="small muted" title="' + esc(L('evRepeat')) + '">&#8635;</span>' : '') + '</b>' +
       '<button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button>' +
       '<button type="button" class="accfold' + (info ? ' open' : '') + '" data-act="ev-card" data-id="' + e.id + '" aria-expanded="' + info + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' +
@@ -490,13 +490,6 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
   }
   function fmtDay(iso) { return new Date(iso).toLocaleDateString(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
-  // Kategorien der Events: feste Liste, je eine Farbe (events.category = id; leer = keine Kategorie)
-  var EVCATS = [
-    { id: 'family', c: '#307CC0' }, { id: 'friends', c: '#8E5BD0' }, { id: 'sport', c: '#1E9E6A' }, { id: 'school', c: '#E07B00' },
-    { id: 'work', c: '#5A6B7B' }, { id: 'leisure', c: '#1AA3B8' }, { id: 'birthday', c: '#D6477E' }, { id: 'other', c: '#A0764A' }
-  ];
-  function catOf(e) { return EVCATS.filter(function (x) { return x.id === e.category; })[0] || null; }
-  function catColor(e) { var c = catOf(e); return c ? c.c : ''; }
   function fmtDayShort(iso) { return new Date(iso).toLocaleDateString(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short' }); }
   // Zeitraum eines Events: ends_at ist optional (Datum, Endzeit nur wenn end_time_set); ohne Ende gilt der Starttag
   function evLastDay(e) { return isoDate(new Date(e.ends_at || e.starts_at)); }
@@ -594,11 +587,11 @@
     var html = '<div class="calgrid calwd">' + days.map(function (dy) { return '<span>' + esc(dy.d.toLocaleDateString(LOCALE[lang], { weekday: 'short' })) + '</span>'; }).join('') + '</div>';
     html += '<div class="wkgrid">' + days.map(function (dy) {
       var chips = allday[dy.k].slice(0, 2).map(function (e) {
-        return '<button type="button" class="wkchip' + (isFavEvent(e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '"' + (catOf(e) ? ' style="--c:' + catColor(e) + '"' : '') + ' title="' + esc(e.title) + '">' + esc(e.title) + '</button>';
+        return '<button type="button" class="wkchip' + (isFavEvent(e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '" title="' + esc(e.title) + '">' + esc(e.title) + '</button>';
       }).join('') + (allday[dy.k].length > 2 ? '<i>+' + (allday[dy.k].length - 2) + '</i>' : '');
       var blocks = segs[dy.k].map(function (sg) {
         var top = (sg.s - H0 * 60) / 60 * HP, hgt = Math.max(14, (sg.en - sg.s) / 60 * HP - 1), w = 100 / dy.lanes;
-        return '<button type="button" class="wkb' + (isFavEvent(sg.e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '" style="' + (catOf(sg.e) ? '--c:' + catColor(sg.e) + ';' : '') + 'top:' + top + 'px;height:' + hgt + 'px;left:' + sg.lane * w + '%;width:calc(' + w + '% - 1px)" title="' + esc(sg.e.title) + '">' + esc(sg.e.title) + '</button>';
+        return '<button type="button" class="wkb' + (isFavEvent(sg.e.id) ? ' fav' : '') + '" data-act="cal-day" data-val="' + dy.k + '" style="top:' + top + 'px;height:' + hgt + 'px;left:' + sg.lane * w + '%;width:calc(' + w + '% - 1px)" title="' + esc(sg.e.title) + '">' + esc(sg.e.title) + '</button>';
       }).join('');
       var nowLine = dy.k === todayKey && nowMin >= H0 * 60 && nowMin <= H1 * 60 ? '<div class="wknow" style="top:' + (nowMin - H0 * 60) / 60 * HP + 'px"></div>' : '';
       return '<div class="wkcol' + (dy.k === todayKey ? ' today' : '') + (dy.k === sel ? ' sel' : '') + '">' +
@@ -606,10 +599,6 @@
         (anyAll ? '<div class="wkad">' + chips + '</div>' : '') +
         '<div class="wkbody" style="height:' + (H1 - H0) * HP + 'px;--hp:' + HP + 'px">' + blocks + nowLine + '</div></div>';
     }).join('') + '</div>';
-    // Legende: Kategorien, die in dieser Woche vorkommen
-    var used = {}; days.forEach(function (dy) { (byDay[dy.k] || []).forEach(function (e) { if (catOf(e)) used[e.category] = true; }); });
-    var leg = EVCATS.filter(function (x) { return used[x.id]; });
-    if (leg.length) html += '<div class="ttleg">' + leg.map(function (x) { return '<span style="--c:' + x.c + '"><i></i>' + esc(L('cat_' + x.id)) + '</span>'; }).join('') + '</div>';
     return html;
   }
   function viewCalendar(mode) {
@@ -1154,7 +1143,7 @@
       var sid = sids[si], list = bySid[sid].sort(function (x, y) { return new Date(x.starts_at) - new Date(y.starts_at); });
       var lastEv = list[list.length - 1], r = lastEv.series_rule, last = new Date(lastEv.starts_at).getTime(), rows = [];
       genOccurrences(r.start, r.time, r.every, r.unit, r.wd, oneYear(), today()).forEach(function (iso) {
-        if (new Date(iso).getTime() > last) rows.push({ is_private: !!lastEv.is_private, title: lastEv.title, place: lastEv.place, comment: lastEv.comment || null, rsvp: lastEv.rsvp, time_set: lastEv.time_set, starts_at: iso, ends_at: shiftEnd(lastEv.starts_at, lastEv.ends_at, iso), end_time_set: !!lastEv.end_time_set, category: lastEv.category || null, series_id: sid, series_open: true, series_rule: r });
+        if (new Date(iso).getTime() > last) rows.push({ is_private: !!lastEv.is_private, title: lastEv.title, place: lastEv.place, comment: lastEv.comment || null, rsvp: lastEv.rsvp, time_set: lastEv.time_set, starts_at: iso, ends_at: shiftEnd(lastEv.starts_at, lastEv.ends_at, iso), end_time_set: !!lastEv.end_time_set, series_id: sid, series_open: true, series_rule: r });
       });
       if (!rows.length) continue;
       var res = await sb.from(T('events')).insert(rows).select('id');
@@ -1266,7 +1255,6 @@
       { name: 'end_date', label: L('evEndDate'), type: 'date', value: endLocal[0], inline: true, pair: 2 },
       { name: 'end_time', label: '', type: 'time', value: ev && ev.end_time_set ? endLocal[1] : '', inline: true, pair: 2 },
       favPeopleField(haveEv, true),
-      { name: 'category', label: L('evCategory'), type: 'cat', value: (ev && ev.category) || '', options: [{ v: '', c: 'var(--muted)', l: L('catNone') }].concat(EVCATS.map(function (x) { return { v: x.id, c: x.c, l: L('cat_' + x.id) }; })) },
       (!ev || ev.created_by === S.me.id) ? privField(ev) : null,
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, half: true },
     ].filter(Boolean);
@@ -1295,7 +1283,7 @@
     if (endDate && (endDate < f.date || (endDate === f.date && f.end_time && f.end_time < tm))) return toast(L('evEndBefore'));
     if (endDate === f.date && !f.end_time) endDate = '';
     var endsIso = endDate ? new Date(endDate + 'T' + (f.end_time || '00:00')).toISOString() : null;
-    var row = { title: f.title, place: ev ? ev.place : null, comment: ev ? ev.comment : null, starts_at: new Date(f.date + 'T' + tm).toISOString(), ends_at: endsIso, end_time_set: !!(endsIso && f.end_time), category: f.category || null, rsvp: !!f.rsvp, time_set: hasTime };
+    var row = { title: f.title, place: ev ? ev.place : null, comment: ev ? ev.comment : null, starts_at: new Date(f.date + 'T' + tm).toISOString(), ends_at: endsIso, end_time_set: !!(endsIso && f.end_time), rsvp: !!f.rsvp, time_set: hasTime };
     var users = f.private ? [S.me.id] : (f.users || []);   // privat: nur ich
     if (f.private !== undefined) row.is_private = !!f.private;
     // ersetzt die Zuteilung der angegebenen Events durch die gewählten Personen
@@ -1312,7 +1300,7 @@
       if (ev) occ = occ.filter(function (iso) { return new Date(iso) > new Date(row.starts_at); });   // der bearbeitete Termin ist der erste der Serie
       if (!occ.length) return toast(L('evNoOcc'));
       var sid = newSeriesId();
-      var rows = occ.map(function (iso) { return { is_private: !!row.is_private, title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: iso, ends_at: shiftEnd(row.starts_at, row.ends_at, iso), end_time_set: row.end_time_set, category: row.category, series_id: sid, series_open: true, series_rule: rule }; });
+      var rows = occ.map(function (iso) { return { is_private: !!row.is_private, title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: iso, ends_at: shiftEnd(row.starts_at, row.ends_at, iso), end_time_set: row.end_time_set, series_id: sid, series_open: true, series_rule: rule }; });
       return act(async function () {
         if (ev) { var u0 = await sb.from(T('events')).update(Object.assign({}, row, { series_id: sid, series_open: true, series_rule: rule })).eq('id', ev.id); if (u0.error) throw u0.error; }
         var r = await sb.from(T('events')).insert(rows).select('id'); if (r.error) throw r.error;
@@ -1330,7 +1318,7 @@
           var ups = await Promise.all(fol.map(function (x) {
             var nd = new Date(x.starts_at); nd.setDate(nd.getDate() + dayDelta);
             var nsIso = new Date(isoDate(nd) + 'T' + tm).toISOString();
-            return sb.from(T('events')).update({ is_private: !!(row.is_private != null ? row.is_private : ev.is_private), title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: nsIso, ends_at: shiftEnd(row.starts_at, row.ends_at, nsIso), end_time_set: row.end_time_set, category: row.category }).eq('id', x.id);
+            return sb.from(T('events')).update({ is_private: !!(row.is_private != null ? row.is_private : ev.is_private), title: row.title, place: row.place, comment: row.comment, rsvp: row.rsvp, time_set: hasTime, starts_at: nsIso, ends_at: shiftEnd(row.starts_at, row.ends_at, nsIso), end_time_set: row.end_time_set }).eq('id', x.id);
           }));
           ups.forEach(function (u) { if (u.error) throw u.error; });
           ids = ids.concat(fol.map(function (x) { return x.id; }));

@@ -346,10 +346,7 @@ textarea[name]{width:100%;font-family:inherit;font-size:1rem;padding:10px 12px;b
 .wkb{position:absolute;border:0;border-left:3px solid var(--c,var(--crown));background:color-mix(in srgb,var(--c,var(--crown)) 20%,var(--surface));color:var(--ink);font:inherit;font-size:.6rem;line-height:1.1;padding:1px 2px;border-radius:3px;text-align:left;overflow:hidden;cursor:pointer;word-break:break-word}
 .wknow{position:absolute;left:0;right:0;height:2px;background:var(--no,#c0392b);pointer-events:none}
 .wkb.fav::after,.wkchip.fav::after{content:"\2605";position:absolute;right:1px;top:0;font-size:.55rem;line-height:1;color:var(--warn)}
-.ttleg{display:flex;flex-wrap:wrap;gap:4px 10px;margin:0 0 8px;font-size:.7rem;color:var(--muted)}
-.ttleg span{display:inline-flex;align-items:center;gap:4px}
-.ttleg i,.catopt i{width:10px;height:10px;border-radius:50%;background:var(--c);display:inline-block}
-.ccel.hascat{border-left:5px solid var(--c)}
+.catopt i{width:10px;height:10px;border-radius:50%;background:var(--c);display:inline-block}
 .catpick{display:flex;flex-wrap:wrap;gap:6px}
 .catopt{position:relative;display:inline-flex;align-items:center;gap:5px;padding:4px 10px 4px 8px;border:1.5px solid var(--line);border-radius:999px;cursor:pointer;font-size:.8rem;background:var(--surface)}
 .catopt input{position:absolute;opacity:0;pointer-events:none}
