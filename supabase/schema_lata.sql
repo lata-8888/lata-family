@@ -81,8 +81,10 @@ alter table public."lata-tasks" add column if not exists is_private boolean not 
 create table if not exists public."lata-task_assignees" (
   task_id uuid not null references public."lata-tasks"(id) on delete cascade,
   user_id uuid not null references public."lata-profiles"(id) on delete cascade,
+  active boolean not null default true,   -- aktiviert = erscheint bei der Person unter «Offen»; Erledigen deaktiviert
   primary key (task_id, user_id)
 );
+alter table public."lata-task_assignees" add column if not exists active boolean not null default true;
 create index if not exists "lata-task_assignees_user_idx" on public."lata-task_assignees" (user_id);
 
 create table if not exists public."lata-recurring_tasks" (

@@ -129,7 +129,7 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-others': false, 'need-catalog': false, 'task-more': false }, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
   var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
@@ -694,6 +694,8 @@
   /* ---------- Tasks: gemeinsame Aufgaben; Favorit = zugeteilte Person (lata-task_assignees); Termin optional ---------- */
   function today() { var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
   function fmtDue(d) { return new Date(d + 'T12:00:00').toLocaleDateString(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
+  // aktiviert = zugeteilt und nicht deaktiviert (Erledigen deaktiviert den Task für mich)
+  function isActiveTask(id) { return S.taskAssign.some(function (x) { return x.task_id === id && x.user_id === S.me.id && x.active !== false; }); }
   function isFavTask(id) { return S.taskAssign.some(function (x) { return x.task_id === id && x.user_id === S.me.id; }); }
   function taskWho(id) { return S.taskAssign.filter(function (x) { return x.task_id === id; }).map(function (x) { return x.user_id; }); }
   function canEditTask(t) { return t.created_by === S.me.id || isAdmin(); }
@@ -704,13 +706,17 @@
     if (a.due_date || b.due_date) return a.due_date ? -1 : 1;
     return a.title.localeCompare(b.title, LOCALE[lang]);
   }
-  function taskRow(t) {
+  // mode: 'open' (mir zugeteilt, aktiv, offen) | 'done' (mir zugeteilt, nicht aktiv oder erledigt) | 'others' | leer (Admin-Liste)
+  function taskRow(t, mode) {
     var fav = isFavTask(t.id), canEdit = canEditTask(t), canDone = fav || canEdit;   // erledigen: Zugeteilte, Ersteller/in, Admins
-    var over = !t.done && t.due_date && t.due_date < today();
+    var back = mode === 'done';   // Register «Erledigt»: Kästchen angehakt, ein Tipp aktiviert den Task wieder
+    var tdone = back || t.done;
+    var over = !tdone && t.due_date && t.due_date < today();
     var who = taskWho(t.id).map(function (u) { return u === S.me.id ? L('you') : nameOf(u); });
     var favLbl = fav ? L('shFavRemove') : L('shFavAdd');
-    return '<li class="trow' + (t.done ? ' tdone' : '') + '">' +
-      (canDone ? '<button type="button" role="checkbox" class="tchk' + (t.done ? ' on' : '') + '" data-act="task-done" data-id="' + t.id + '" aria-checked="' + t.done + '" aria-label="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '" title="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '">' + ICON.check + '</button>' : '<span class="tspace" aria-hidden="true"></span>') +
+    var chk = back ? '<button type="button" role="checkbox" class="tchk on" data-act="task-activate" data-id="' + t.id + '" aria-checked="true" aria-label="' + esc(L('taskReactivate')) + '" title="' + esc(L('taskReactivate')) + '">' + ICON.check + '</button>'
+      : canDone ? '<button type="button" role="checkbox" class="tchk' + (t.done ? ' on' : '') + '" data-act="task-done" data-id="' + t.id + '" aria-checked="' + !!t.done + '" aria-label="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '" title="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '">' + ICON.check + '</button>' : '<span class="tspace" aria-hidden="true"></span>';
+    return '<li class="trow' + (tdone ? ' tdone' : '') + '">' + chk +
       '<div class="l"><b>' + lockIcon(t) + esc(t.title) + '</b>' +
       (who.length ? '<span>' + esc(L('shFor', { names: who.join(', ') })) + '</span>' : '') +
       (t.due_date ? '<span class="' + (over ? 'tover' : '') + '">' + esc(L('taskDueOn', { date: fmtDue(t.due_date) })) + (over ? ' · ' + esc(L('taskOverdue')) : '') + '</span>' : '') +
@@ -719,15 +725,24 @@
       '<button type="button" class="hico" data-act="task-edit" data-id="' + t.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (fav ? ' on' : '') + '" data-act="task-fav" data-id="' + t.id + '" aria-pressed="' + fav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button></div></li>';
   }
+  // Register: «Offen» (mir zugeteilt, aktiv, unerledigt), «Erledigt» (mir zugeteilt, nicht aktiv oder erledigt), «Andere» (nicht mir zugeteilt)
+  function taskGroups() {
+    var g = { open: [], done: [], others: [] };
+    S.tasks.forEach(function (t) {
+      if (!isFavTask(t.id)) g.others.push(t);
+      else if (isActiveTask(t.id) && !t.done) g.open.push(t);
+      else g.done.push(t);
+    });
+    Object.keys(g).forEach(function (k) { g[k].sort(taskSort); });
+    return g;
+  }
   function viewTasks() {
-    var favs = S.tasks.filter(function (t) { return isFavTask(t.id); }).sort(taskSort);
-    var more = S.tasks.filter(function (t) { return !isFavTask(t.id); }).sort(taskSort);
-    var open = function (a) { return a.filter(function (t) { return !t.done; }).length; };
-    var list = function (a) { return a.length ? '<ul class="list">' + a.map(taskRow).join('') + '</ul>' : '<p class="muted">' + esc(L('taskEmpty')) + '</p>'; };
-    // wie im Einkauf: oben meine Favoriten, darunter alle weiteren Aufgaben; «+» legt eine neue Aufgabe an
-    return '<div class="top"><div><h1 class="pagetitle">' + esc(L('navTasks')) + '</h1></div></div>' +
-      accordion('task-favs', L('taskMine'), open(favs), list(favs)) +
-      accordion('task-more', L('taskMore'), open(more), list(more), 'task-new', L('taskNew'));
+    var g = taskGroups(), view = S.taskView === 'done' || S.taskView === 'others' ? S.taskView : 'open';
+    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navTasks')) + '</h1></div>' +
+      '<button type="button" class="hico addbtn" data-act="task-new" aria-label="' + esc(L('taskNew')) + '" title="' + esc(L('taskNew')) + '">' + ICON.plus + '</button></div>';
+    var tab = function (v, label) { var on = v === view; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="task-view" data-val="' + v + '">' + esc(label) + ' (' + g[v].length + ')</button>'; };
+    html += '<div class="subtabs" role="tablist">' + tab('open', L('taskTabOpen')) + tab('done', L('taskDone')) + tab('others', L('taskTabOthers')) + '</div>';
+    return html + (g[view].length ? '<ul class="list">' + g[view].map(function (t) { return taskRow(t, view); }).join('') + '</ul>' : '<p class="muted">' + esc(L('taskEmpty')) + '</p>');
   }
   async function taskForm(t) {
     // Ersteller/in und Admins ändern die Aufgabe; alle anderen sehen nur «Favorit für» (Personen hinzufügen, sich selbst abwählen)
@@ -1111,7 +1126,7 @@
   function badges() {
     var td = today(), b = { events: false, tasks: 0, admin: false, total: 0 };
     b.events = S.events.some(function (e) { return evDays(e).indexOf(td) > -1; });
-    b.tasks = S.tasks.filter(function (t) { return !t.done && t.due_date && t.due_date <= td && isFavTask(t.id); }).length;
+    b.tasks = S.tasks.filter(function (t) { return !t.done && t.due_date && t.due_date <= td && isActiveTask(t.id); }).length;
     b.admin = canManageEvents() && S.me.is_admin && S.members.some(function (m) { return !m.pin_changed; });
     b.total = (b.events ? 1 : 0) + b.tasks + (b.admin ? 1 : 0);
     return b;
@@ -1533,9 +1548,23 @@
       }
       case 'task-new': return taskForm(null);
       case 'task-edit': return taskForm(S.tasks.filter(function (x) { return x.id === id; })[0]);
+      case 'task-view': S.taskView = v; return render();
       case 'task-done': {
+        // erledigen deaktiviert den Task für mich (Register «Erledigt»); wieder öffnen aktiviert ihn
         var tk = S.tasks.filter(function (x) { return x.id === id; })[0]; if (!tk) return;
-        return act(async function () { var r = await sb.from(T('tasks')).update({ done: !tk.done }).eq('id', id); if (r.error) throw r.error; });
+        var mineT = isFavTask(id);
+        return act(async function () {
+          var r = await sb.from(T('tasks')).update({ done: !tk.done }).eq('id', id); if (r.error) throw r.error;
+          if (mineT) { var r2 = await sb.from(T('task_assignees')).update({ active: !!tk.done }).eq('task_id', id).eq('user_id', S.me.id); if (r2.error) throw r2.error; }
+        });
+      }
+      case 'task-activate': {
+        // aus dem Register «Erledigt» zurück zu «Offen»
+        var tk2 = S.tasks.filter(function (x) { return x.id === id; })[0]; if (!tk2) return;
+        return act(async function () {
+          var r = await sb.from(T('task_assignees')).update({ active: true }).eq('task_id', id).eq('user_id', S.me.id); if (r.error) throw r.error;
+          if (tk2.done) { var r2 = await sb.from(T('tasks')).update({ done: false }).eq('id', id); if (r2.error) throw r2.error; }
+        });
       }
       case 'task-fav': {
         // Stern: Favorit setzen/entfernen (nur der eigene Eintrag)

@@ -1,13 +1,12 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    taskTabOpen: 'Offen', taskTabOthers: 'Andere', taskReactivate: 'Wieder aktivieren',
     evToCal: 'Zum Kalender hinzufügen (Outlook, Apple Kalender)',
     badgeEvToday: 'Heute steht ein Event an', badgeTasks: '{n} offene Task(s) heute oder überfällig', badgeAdmin: 'Es gibt Personen, die ihre PIN noch nicht geändert haben',
     privLabel: 'Privat (nur für mich sichtbar)', privShared: 'Privat nicht möglich: andere Personen führen dieses Produkt als Favorit.',
     evAllDay: 'Ganztägig',
-    taskMine: 'Meine Tasks',
     evEndDate: 'Bis', evFromTime: 'ab {t}', evUntilTime: 'bis {t}', evEndBefore: 'Das Ende liegt vor dem Start.', evEndNeedsStart: 'Für eine Endzeit braucht es eine Startzeit.',
-    taskMore: 'Weitere Tasks',
     evTabWeek: 'Woche', evTabMonth: 'Monat', evPrevWeek: 'Vorherige Woche', evNextWeek: 'Nächste Woche', evWeekLabel: 'KW {n}', evNoneInPeriod: 'Keine Termine in diesem Zeitraum.', evFav: 'Als Favorit markieren', evUnfav: 'Favorit entfernen',
     shFavFor: 'Favorit für', shNobody: 'Niemand',
     shFavs: 'Meine Favoriten', shMore: 'Weitere Produkte', shMoreEmpty: 'Keine weiteren Produkte.', shFavAdd: 'Zu Favoriten hinzufügen', shFavRemove: 'Aus Favoriten entfernen', 
@@ -63,13 +62,12 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    taskTabOpen: 'Open', taskTabOthers: 'Others', taskReactivate: 'Reactivate',
     evToCal: 'Add to calendar (Outlook, Apple Calendar)',
     badgeEvToday: 'An event is on today', badgeTasks: '{n} open task(s) due today or overdue', badgeAdmin: 'Some people have not changed their PIN yet',
     privLabel: 'Private (only visible to me)', privShared: 'Cannot be private: other people have this product as a favorite.',
     evAllDay: 'All day',
-    taskMine: 'My tasks',
     evEndDate: 'To', evFromTime: 'from {t}', evUntilTime: 'until {t}', evEndBefore: 'The end is before the start.', evEndNeedsStart: 'An end time needs a start time.',
-    taskMore: 'More tasks',
     evTabWeek: 'Week', evTabMonth: 'Month', evPrevWeek: 'Previous week', evNextWeek: 'Next week', evWeekLabel: 'Week {n}', evNoneInPeriod: 'No events in this period.', evFav: 'Mark as favorite', evUnfav: 'Remove favorite',
     shFavFor: 'Favorite for', shNobody: 'Nobody',
     shFavs: 'My favorites', shMore: 'More products', shMoreEmpty: 'No more products.', shFavAdd: 'Add to favorites', shFavRemove: 'Remove from favorites', 
@@ -125,13 +123,12 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    taskTabOpen: 'Open', taskTabOthers: 'Overige', taskReactivate: 'Opnieuw activeren',
     evToCal: 'Aan agenda toevoegen (Outlook, Apple Agenda)',
     badgeEvToday: 'Vandaag staat er een event op de agenda', badgeTasks: '{n} open taak/taken vandaag of te laat', badgeAdmin: 'Sommige personen hebben hun pincode nog niet gewijzigd',
     privLabel: 'Privé (alleen voor mij zichtbaar)', privShared: 'Privé niet mogelijk: andere personen hebben dit product als favoriet.',
     evAllDay: 'Hele dag',
-    taskMine: 'Mijn taken',
     evEndDate: 'Tot', evFromTime: 'vanaf {t}', evUntilTime: 'tot {t}', evEndBefore: 'Het einde ligt voor het begin.', evEndNeedsStart: 'Een eindtijd heeft een starttijd nodig.',
-    taskMore: 'Overige taken',
     evTabWeek: 'Week', evTabMonth: 'Maand', evPrevWeek: 'Vorige week', evNextWeek: 'Volgende week', evWeekLabel: 'Week {n}', evNoneInPeriod: 'Geen afspraken in deze periode.', evFav: 'Als favoriet markeren', evUnfav: 'Favoriet verwijderen',
     shFavFor: 'Favoriet voor', shNobody: 'Niemand',
     shFavs: 'Mijn favorieten', shMore: 'Overige producten', shMoreEmpty: 'Geen overige producten.', shFavAdd: 'Aan favorieten toevoegen', shFavRemove: 'Uit favorieten verwijderen', 
