@@ -885,6 +885,26 @@
       '<div class="l"><b>' + (isGastro() && shop ? qtyN + '× ' : '') + lockIcon(it.p) + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
       '<div class="btnrow">' + menu + star + '</div>' + (gfav ? counter : (check || '<span class="tspace" aria-hidden="true"></span>')) + '</li>';
   }
+  // Gastronomie: Produkte nach Gruppe (Rubrik der Speisekarte) geordnet mit Überschrift; Gruppen in Kartenreihenfolge (kleinste Nummer), darin nach Nummer, sonst Name
+  // Reihenfolge in der Karte: Spalte pos, sonst numerische ID, sonst zuletzt (dann nach Name)
+  function ordOf(p) { return p.pos != null ? p.pos : /^\d+$/.test(p.ref || '') ? parseInt(p.ref, 10) : 1e9; }
+  function grpOrder() {
+    var min = {};
+    shopProds().forEach(function (p) { if (!p.grp) return; var n = ordOf(p); if (min[p.grp] === undefined || n < min[p.grp]) min[p.grp] = n; });
+    return Object.keys(min).sort(function (x, y) { return min[x] - min[y] || x.localeCompare(y, LOCALE[lang]); });
+  }
+  function shopRows(items, mode, emptyKey) {
+    if (!isGastro() || !items.some(function (it) { return it.p.grp; })) return ulOf(items.map(function (it) { return needRow(it, mode); }), emptyKey);
+    var order = grpOrder(), gi = function (it) { var k = order.indexOf(it.p.grp); return k < 0 ? 1e6 : k; };
+    var num = function (it) { return ordOf(it.p); };
+    var sorted = items.slice().sort(function (x, y) { return gi(x) - gi(y) || num(x) - num(y) || byItem(x, y); });
+    var rows = [], last = null;
+    sorted.forEach(function (it) {
+      if (it.p.grp && it.p.grp !== last) { rows.push('<li class="grphead">' + esc(it.p.grp) + '</li>'); last = it.p.grp; }
+      rows.push(needRow(it, mode));
+    });
+    return ulOf(rows, emptyKey);
+  }
   function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
   // Register «Wunschliste | Einkaufslisten» mit Inhalt (Einkauf und jede Gastronomie-Sektion)
   function shopBody() {
@@ -916,8 +936,8 @@
     // Weitere Produkte: alle übrigen Produkte (auch ohne Wünsche); «+» legt ein neues Produkt an
     var mine = {}; favs.forEach(function (it) { mine[it.p.id] = true; });
     var more = shopProds().filter(function (p) { return !mine[p.id]; }).map(function (p) { return { p: p, w: null, ws: S.wishes.filter(function (w) { return w.product_id === p.id; }), listId: '' }; }).sort(byItem);
-    return accordion('need-open:' + shopKey(), L('shFavs'), favs.length, ulOf(favs.map(function (it) { return needRow(it, 'fav'); }), 'shEmpty')) +
-      accordion('need-others:' + shopKey(), L('shMore'), more.length, ulOf(more.map(function (it) { return needRow(it, 'more'); }), 'shMoreEmpty'));
+    return accordion('need-open:' + shopKey(), L('shFavs'), favs.length, shopRows(favs, 'fav', 'shEmpty')) +
+      accordion('need-others:' + shopKey(), L('shMore'), more.length, shopRows(more, 'more', 'shMoreEmpty'));
   }  function viewLists() {
     var sel = S.wishes.filter(function (w) { return w.selected && inShop(productById(w.product_id)); });   // nur auf der Wunschliste gewählte Produkte
     var none = groupItems(sel.filter(function (w) { return !w.list_id && w.user_id === S.me.id; }));   // ohne Liste: nur meine
@@ -969,6 +989,7 @@
     if (canRename(p)) fields.push({ name: 'name', label: L('shName'), value: p.name, inline: true });
     // Gastronomie: ein Produkt ganz bearbeiten – auch ID, Zutaten und Preis
     if (isGastro() && canRename(p)) {
+      fields.push({ name: 'grp', label: L('shGroup'), value: p.grp || '', inline: true });
       fields.push({ name: 'ref', label: L('shRef'), value: p.ref || '', inline: true });
       fields.push({ name: 'info', label: L('shInfo'), value: p.info || '', inline: true });
       fields.push({ name: 'price', label: L('shPrice'), type: 'number', step: 0.05, value: p.price == null ? '' : String(p.price), inline: true });
@@ -1580,6 +1601,7 @@
           if (!newName) throw new Error(L('shMissing'));
           var pu = {};
           if (newName !== ne.name) pu.name = newName;
+          if (nfe.grp !== undefined && (nfe.grp.trim() || null) !== (ne.grp || null)) pu.grp = nfe.grp.trim() || null;
           if (nfe.ref !== undefined && (nfe.ref.trim() || null) !== (ne.ref || null)) pu.ref = nfe.ref.trim() || null;
           if (nfe.info !== undefined && (nfe.info.trim() || null) !== (ne.info || null)) pu.info = nfe.info.trim() || null;
           if (nfe.price !== undefined) {

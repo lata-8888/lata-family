@@ -128,6 +128,8 @@ create table if not exists public."lata-products" (
   shop text not null default 'einkauf',        -- Seite: 'einkauf' oder 'ilmio' (Il Mio Quattro, Pizzakarte)
   list_id uuid,                                -- Einkaufsliste des Produkts (gilt für alle; Fremdschlüssel unten)
   ref text,                                    -- externe Nummer (vorerst unsichtbar)
+  grp text check (grp is null or char_length(grp) <= 60),   -- Gruppe/Rubrik der Speisekarte (Gastronomie)
+  pos integer,                                 -- Reihenfolge in der Speisekarte (sonst nach ID)
   info text,                                   -- Zutaten
   price numeric(8,2),
   created_at timestamptz not null default now()
@@ -140,6 +142,8 @@ do $$ begin
   end if;
 end $$;
 alter table public."lata-products" add column if not exists ref text;
+alter table public."lata-products" add column if not exists grp text check (grp is null or char_length(grp) <= 60);
+alter table public."lata-products" add column if not exists pos integer;
 alter table public."lata-products" add column if not exists info text;
 alter table public."lata-products" add column if not exists price numeric(8,2);
 alter table public."lata-products" add column if not exists is_private boolean not null default false;
