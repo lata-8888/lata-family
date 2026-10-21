@@ -924,8 +924,6 @@
         (open ? '<div class="accbody">' + (itemsOpen.length || !itemsDone.length ? ulOf(itemsOpen.map(function (it) { return needRow(it, 'list'); }), 'shEmpty') : '') +
           (itemsDone.length ? '<ul class="list">' + itemsDone.map(function (it) { return needRow(it, 'list'); }).join('') + '</ul>' : '') + (gastro ? totalsLine(items) : '') + '</div>' : '') + '</section>';
     });
-    // Gastronomie: Gesamtanzahl und Gesamtpreis über alle Listen unten
-    if (gastro) { var allItems = groupItems(sel); if (allItems.length) { var gt = itemTotals(allItems); html += '<section class="card shgrand"><b>' + esc(L('shGrand')) + '</b><span>' + esc(L('shTotals', { n: gt.n, sum: fmtMoney(gt.sum) })) + '</span></section>'; } }
     return html;
   }
   function memberOptions() {

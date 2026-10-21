@@ -2,7 +2,7 @@
 window.APP_DICT = {
   de: {
     navGastro: 'Gastro',
-    shQtyLess: 'Weniger', shQtyMore: 'Mehr', shTotals: 'Anzahl: {n} · Total: {sum}', shGrand: 'Gesamt',
+    shQtyLess: 'Weniger', shQtyMore: 'Mehr', shTotals: 'Anzahl: {n} · Total: {sum}',
     gastroAdd: 'Gastronomie hinzufügen', gastroName: 'Name', gastroEmpty: 'Noch keine Gastronomie.',
     adminGastro: 'Gastronomie',
     shListAdd: 'Einkaufsliste hinzufügen', shListEdit: 'Einkaufsliste bearbeiten', userEdit: 'Person bearbeiten', profNameTitle: 'Name ändern', profPhoneTitle: 'Handynummer ändern',
@@ -67,7 +67,7 @@ window.APP_DICT = {
   },
   en: {
     navGastro: 'Gastro',
-    shQtyLess: 'Fewer', shQtyMore: 'More', shTotals: 'Count: {n} · Total: {sum}', shGrand: 'Total',
+    shQtyLess: 'Fewer', shQtyMore: 'More', shTotals: 'Count: {n} · Total: {sum}',
     gastroAdd: 'Add gastronomy', gastroName: 'Name', gastroEmpty: 'No gastronomy yet.',
     adminGastro: 'Gastronomy',
     shListAdd: 'Add shopping list', shListEdit: 'Edit shopping list', userEdit: 'Edit person', profNameTitle: 'Change name', profPhoneTitle: 'Change phone number',
@@ -132,7 +132,7 @@ window.APP_DICT = {
   },
   nl: {
     navGastro: 'Gastro',
-    shQtyLess: 'Minder', shQtyMore: 'Meer', shTotals: 'Aantal: {n} · Totaal: {sum}', shGrand: 'Totaal',
+    shQtyLess: 'Minder', shQtyMore: 'Meer', shTotals: 'Aantal: {n} · Totaal: {sum}',
     gastroAdd: 'Gastronomie toevoegen', gastroName: 'Naam', gastroEmpty: 'Nog geen gastronomie.',
     adminGastro: 'Gastronomie',
     shListAdd: 'Boodschappenlijst toevoegen', shListEdit: 'Boodschappenlijst bewerken', userEdit: 'Persoon bewerken', profNameTitle: 'Naam wijzigen', profPhoneTitle: 'Telefoonnummer wijzigen',
