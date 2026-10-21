@@ -792,6 +792,7 @@
   // Reiter «Gastro» = eine Seite mit je einer Sektion pro Gastronomie; S.shopCtx = Sektion, in der gerade gezeichnet wird bzw. die zuletzt angetippt wurde (data-shop)
   function enabledGastros() { return S.gastros.filter(function (g) { return g.enabled; }); }
   function shopKey() { return S.tab === 'gastro' ? (S.shopCtx || (enabledGastros()[0] || {}).key || 'einkauf') : 'einkauf'; }
+  function defaultListId() { var g = S.gastros.filter(function (x) { return x.key === shopKey(); })[0]; return g && listById(g.list_id) ? g.list_id : ''; }
   function isGastro() { return shopKey() !== 'einkauf'; }
   function wQty(w) { return Math.max(1, w.qty || 1); }
   function fmtMoney(n) { return 'CHF ' + n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -1532,7 +1533,7 @@
         var nf = await askForm(L('shAdd'), [
           { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList'), inline: true },
           { name: 'note', label: L('shNote'), inline: true },
-          listField(''),
+          listField(defaultListId()),   // Gastronomie: Standard-Einkaufsliste vorgewählt
           favForField(null, [S.me.id]),
           privField(null)
         ]);

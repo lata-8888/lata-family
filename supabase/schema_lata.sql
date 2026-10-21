@@ -116,9 +116,16 @@ create table if not exists public."lata-gastros" (
   key text primary key check (key ~ '^[a-z0-9_]{2,30}$' and key <> 'einkauf'),
   name text not null check (char_length(name) between 1 and 60),
   enabled boolean not null default false,
+  list_id uuid,                                -- Standard-Einkaufsliste: neue Produkte der Gastronomie hängen daran
   created_at timestamptz not null default now()
 );
 
+alter table public."lata-gastros" add column if not exists list_id uuid;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'lata-gastros_list_fk') then
+    alter table public."lata-gastros" add constraint "lata-gastros_list_fk" foreign key (list_id) references public."lata-shop_lists"(id) on delete set null;
+  end if;
+end $$;
 -- Produktkatalog: jedes Produkt genau einmal (Name ohne Gross-/Kleinschreibung und Randleerzeichen eindeutig)
 create table if not exists public."lata-products" (
   id uuid primary key default gen_random_uuid(),
@@ -484,7 +491,7 @@ create or replace trigger guard_product_private before update on public."lata-pr
 -- Einkaufsliste (lata-products.list_id); hat es noch keine, wird die angegebene seine Liste. Die Wünsche übernehmen sie.
 create or replace function public.lata_add_product_in(p_shop text, p_name text, p_note text, p_list uuid, p_users uuid[], p_private boolean default false) returns uuid
 language plpgsql security definer set search_path = public as $$
-declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid; u uuid; users uuid[]; priv boolean := coalesce(p_private, false); plist uuid; lpriv boolean; lowner uuid;
+declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid; u uuid; users uuid[]; priv boolean := coalesce(p_private, false); plist uuid; lpriv boolean; lowner uuid; was_new boolean := false;
 begin
   if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
   if p_shop <> 'einkauf' and not exists (select 1 from public."lata-gastros" where key = p_shop) then raise exception 'Unbekannte Seite'; end if;
@@ -493,10 +500,16 @@ begin
   select id into pid from public."lata-products" where shop = p_shop and lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end);
   if pid is null then
     insert into public."lata-products" (shop, name, created_by, is_private) values (p_shop, nm, me, priv) on conflict do nothing returning id into pid;
+    was_new := pid is not null;
     if pid is null then select id into pid from public."lata-products" where shop = p_shop and lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end); end if;
   end if;
   select list_id into plist from public."lata-products" where id = pid;
   if plist is null and p_list is not null then update public."lata-products" set list_id = p_list where id = pid; plist := p_list; end if;
+  -- neues Gastronomie-Produkt ohne Angabe: Standard-Einkaufsliste der Gastronomie
+  if plist is null and was_new and p_shop <> 'einkauf' then
+    select list_id into plist from public."lata-gastros" where key = p_shop;
+    if plist is not null then update public."lata-products" set list_id = plist where id = pid; end if;
+  end if;
   select is_private, owner_id into lpriv, lowner from public."lata-shop_lists" where id = plist;
   users := case when priv or p_users is null then array[me] else p_users end;
   foreach u in array users loop
@@ -507,6 +520,7 @@ begin
   end loop;
   return pid;
 end; $$;
+
 
 -- Liste eines Produkts ändern: gilt für alle, unabhängig davon, wer es bestellt
 create or replace function public.lata_set_product_list(p_product uuid, p_list uuid) returns void
@@ -551,14 +565,15 @@ begin
 end; $$;
 create or replace function public.lata_add_gastro(p_name text) returns text
 language plpgsql security definer set search_path = public as $$
-declare nm text := btrim(coalesce(p_name, '')); k text; n int := 1;
+declare nm text := btrim(coalesce(p_name, '')); k text; n int := 1; lid uuid;
 begin
   if not public.lata_is_admin() then raise exception 'Nur Admins'; end if;
   if char_length(nm) not between 1 and 60 then raise exception 'Name fehlt'; end if;
   k := left(coalesce(nullif(regexp_replace(lower(nm), '[^a-z0-9]+', '_', 'g'), ''), 'gastro'), 24);
   k := btrim(k, '_'); if char_length(k) < 2 then k := 'gastro'; end if;
   while exists (select 1 from public."lata-gastros" where key = k) or k = 'einkauf' loop n := n + 1; k := left(k, 24) || '_' || n; end loop;
-  insert into public."lata-gastros" (key, name, enabled) values (k, nm, false);
+  insert into public."lata-shop_lists" (name, owner_id, is_private, shop) values (left(nm, 60), auth.uid(), false, k) returning id into lid;   -- eigene Standard-Einkaufsliste
+  insert into public."lata-gastros" (key, name, enabled, list_id) values (k, nm, false, lid);
   return k;
 end; $$;
 
