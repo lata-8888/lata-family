@@ -507,6 +507,7 @@ declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid;
 begin
   if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
   if p_shop <> 'einkauf' and not exists (select 1 from public."lata-gastros" where key = p_shop) then raise exception 'Unbekannte Seite'; end if;
+  if p_shop = 'einkauf' and not public.lata_is_member() then raise exception 'NEED_FORBIDDEN'; end if;   -- Gäste: nur Gastronomie
   if char_length(nm) not between 1 and 80 then raise exception 'Name fehlt'; end if;
   if not public.lata_can_see_list(p_list) then raise exception 'NEED_FORBIDDEN'; end if;
   select id into pid from public."lata-products" where shop = p_shop and lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end);
@@ -541,6 +542,7 @@ declare me uuid := auth.uid(); pr record; lst record;
 begin
   if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
   select * into pr from public."lata-products" where id = p_product;
+  if found and pr.shop = 'einkauf' and not public.lata_is_member() then raise exception 'NEED_FORBIDDEN'; end if;   -- Gäste: nur Gastronomie
   if not found or (pr.is_private and pr.created_by is distinct from me) then raise exception 'NEED_FORBIDDEN'; end if;
   if p_list is not null then
     select * into lst from public."lata-shop_lists" where id = p_list;
@@ -657,13 +659,13 @@ create policy task_assignees_manage on public."lata-task_assignees" for all to a
 create policy recurring_admin on public."lata-recurring_tasks" for all to authenticated using (public.lata_is_admin()) with check (public.lata_is_admin());
 
 create policy gastros_select on public."lata-gastros" for select to authenticated using (public.lata_is_user());   -- ändern nur per RPC (Admin)
-create policy shop_lists_select on public."lata-shop_lists" for select to authenticated using (public.lata_is_user() and (not is_private or owner_id = auth.uid()));
-create policy shop_lists_insert on public."lata-shop_lists" for insert to authenticated with check (public.lata_is_user() and owner_id = auth.uid());
+create policy shop_lists_select on public."lata-shop_lists" for select to authenticated using (public.lata_is_user() and (shop <> 'einkauf' or public.lata_is_member()) and (not is_private or owner_id = auth.uid()));   -- Gäste: nur Gastronomie-Listen
+create policy shop_lists_insert on public."lata-shop_lists" for insert to authenticated with check (public.lata_is_user() and (shop <> 'einkauf' or public.lata_is_member()) and owner_id = auth.uid());
 create policy shop_lists_update on public."lata-shop_lists" for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy shop_lists_delete on public."lata-shop_lists" for delete to authenticated using (owner_id = auth.uid() or (public.lata_is_admin() and not is_private));
 
 create policy products_select on public."lata-products" for select to authenticated
-  using (public.lata_is_user() and (not is_private or created_by = auth.uid()));
+  using (public.lata_is_user() and (shop <> 'einkauf' or public.lata_is_member()) and (not is_private or created_by = auth.uid()));   -- Gäste: nur Gastronomie-Produkte
 create policy products_update on public."lata-products" for update to authenticated
   using (public.lata_is_user() and (created_by = auth.uid() or (public.lata_is_admin() and not is_private)))
   with check (created_by = auth.uid() or (public.lata_is_admin() and not is_private));
