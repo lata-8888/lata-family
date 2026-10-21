@@ -363,7 +363,7 @@ textarea[name]{width:100%;font-family:inherit;font-size:1rem;padding:10px 12px;b
 .switch.on{background:var(--yes)}
 .switch.on i{left:23px}
 
-.qtyline{display:flex;align-items:center;gap:6px;margin-top:6px}
+.qtyline{display:flex;align-items:center;gap:4px;margin-left:auto;flex:0 0 auto}
 .qb{width:30px;height:30px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:1.1rem;font-weight:700;line-height:1;padding:0}
 .qb[disabled]{opacity:.35}
 .qn{font-style:normal;min-width:1.6em;text-align:center;font-weight:700;color:var(--ink)}

@@ -876,12 +876,13 @@
     var isFav = !!it.w, favLbl = isFav ? L('shFavRemove') : L('shFavAdd');
     var star = '<button type="button" class="hico star' + (isFav ? ' on' : '') + '" data-act="' + (isFav ? 'need-unwish' : 'need-wish') + '" data-id="' + it.p.id + '" aria-pressed="' + isFav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button>';
     var menu = '<button type="button" class="hico" data-act="need-edit" data-id="' + it.p.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>';
+    // Gastronomie: in den Favoriten ersetzt der Zähler (− n +) rechts das Kästchen; 0 = nicht auf der Einkaufsliste, ab 1 steht der Eintrag mit dieser Anzahl darauf
+    var cur = fav && it.w.selected ? wQty(it.w) : 0, gfav = isGastro() && fav;
+    var counter = gfav ? '<div class="qtyline"><button type="button" class="qb" data-act="need-qty" data-id="' + it.p.id + '" data-val="-1" aria-label="' + esc(L('shQtyLess')) + '"' + (cur <= 0 ? ' disabled' : '') + '>−</button><i class="qn" aria-live="polite">' + cur + '</i><button type="button" class="qb" data-act="need-qty" data-id="' + it.p.id + '" data-val="1" aria-label="' + esc(L('shQtyMore')) + '"' + (cur >= 99 ? ' disabled' : '') + '>+</button></div>' : '';
     var qtyN = shop ? it.ws.reduce(function (s, w) { return s + wQty(w); }, 0) : 0;
-    // Gastronomie: in den Favoriten wählt man die Anzahl (− n +), in der Einkaufsliste steht sie als «n×» vor dem Namen
-    var stepper = isGastro() && fav ? '<div class="qtyline"><button type="button" class="qb" data-act="need-qty" data-id="' + it.p.id + '" data-val="-1" aria-label="' + esc(L('shQtyLess')) + '"' + (wQty(it.w) <= 1 ? ' disabled' : '') + '>−</button><i class="qn" aria-live="polite">' + wQty(it.w) + '</i><button type="button" class="qb" data-act="need-qty" data-id="' + it.p.id + '" data-val="1" aria-label="' + esc(L('shQtyMore')) + '"' + (wQty(it.w) >= 99 ? ' disabled' : '') + '>+</button></div>' : '';
     return '<li class="trow shopi' + ((fav ? it.w.checked : shop && bought) ? ' chk' : '') + '">' +
-      '<div class="l"><b>' + (isGastro() && shop ? qtyN + '× ' : '') + lockIcon(it.p) + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span>' + stepper + '</div>' +
-      '<div class="btnrow">' + menu + star + '</div>' + (check || '<span class="tspace" aria-hidden="true"></span>') + '</li>';
+      '<div class="l"><b>' + (isGastro() && shop ? qtyN + '× ' : '') + lockIcon(it.p) + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
+      '<div class="btnrow">' + menu + star + '</div>' + (gfav ? counter : (check || '<span class="tspace" aria-hidden="true"></span>')) + '</li>';
   }
   function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
   function viewShop() {
@@ -1462,9 +1463,11 @@
       case 'who': S.open['ev:' + id] = !S.open['ev:' + id]; return render();
       case 'need-qty': {
         var qw = myWish(id); if (!qw) return;
-        var nq = Math.max(1, Math.min(99, wQty(qw) + (parseInt(v, 10) || 0)));
-        if (nq === wQty(qw)) return;
-        return act(async function () { var r = await sb.from(T('wishes')).update({ qty: nq }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; });
+        var cq = qw.selected ? wQty(qw) : 0, nq = Math.max(0, Math.min(99, cq + (parseInt(v, 10) || 0)));
+        if (nq === cq) return;
+        // 0 nimmt den Eintrag von der Einkaufsliste, ab 1 steht er mit dieser Anzahl darauf
+        var upd = nq === 0 ? { selected: false, checked: false, qty: 1 } : { selected: true, qty: nq };
+        return act(async function () { var r = await sb.from(T('wishes')).update(upd).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; });
       }
       case 'shop-view': S.shopViews[shopKey()] = v; return render();
       case 'list-edit': {
