@@ -953,6 +953,12 @@
   async function needEditForm(p) {
     var w = myWish(p.id), fields = [];
     if (canRename(p)) fields.push({ name: 'name', label: L('shName'), value: p.name, inline: true });
+    // Gastronomie: ein Produkt ganz bearbeiten – auch ID, Zutaten und Preis
+    if (isGastro() && canRename(p)) {
+      fields.push({ name: 'ref', label: L('shRef'), value: p.ref || '', inline: true });
+      fields.push({ name: 'info', label: L('shInfo'), value: p.info || '', inline: true });
+      fields.push({ name: 'price', label: L('shPrice'), type: 'number', step: 0.05, value: p.price == null ? '' : String(p.price), inline: true });
+    }
     // Notiz und Liste gehören zum Favoriten; ist das Produkt noch kein Favorit, gelten sie für die neu gewählten Personen
     fields.push({ name: 'note', label: L('shNote'), value: w ? w.note : '', inline: true });
     fields.push(listField(listById(p.list_id) ? p.list_id : ''));   // die Einkaufsliste gehört zum Produkt und gilt für alle
@@ -1553,7 +1559,16 @@
         return act(async function () {
           var newName = String(nfe.name == null ? ne.name : nfe.name).trim();
           if (!newName) throw new Error(L('shMissing'));
-          if (newName !== ne.name) { var rn = await sb.from(T('products')).update({ name: newName }).eq('id', id); if (rn.error) throw rn.error; }
+          var pu = {};
+          if (newName !== ne.name) pu.name = newName;
+          if (nfe.ref !== undefined && (nfe.ref.trim() || null) !== (ne.ref || null)) pu.ref = nfe.ref.trim() || null;
+          if (nfe.info !== undefined && (nfe.info.trim() || null) !== (ne.info || null)) pu.info = nfe.info.trim() || null;
+          if (nfe.price !== undefined) {
+            var pr = String(nfe.price).trim().replace(',', '.'), pn = pr === '' ? null : Number(pr);
+            if (pn !== null && (!isFinite(pn) || pn < 0 || pn > 99999)) throw new Error(L('shPriceBad'));
+            if (pn !== (ne.price == null ? null : Number(ne.price))) pu.price = pn;
+          }
+          if (Object.keys(pu).length) { var rn = await sb.from(T('products')).update(pu).eq('id', id); if (rn.error) throw rn.error; }
           var isPriv = nfe.private !== undefined ? !!nfe.private : !!ne.is_private;
           if (isPriv !== !!ne.is_private) { var rp = await sb.from(T('products')).update({ is_private: isPriv }).eq('id', id); if (rp.error) throw rp.error; }
           // Einkaufsliste ändern: gilt für das Produkt, unabhängig davon, wer es bestellt
