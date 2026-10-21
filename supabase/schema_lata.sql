@@ -153,10 +153,17 @@ create table if not exists public."lata-wishes" (
   list_id uuid references public."lata-shop_lists"(id) on delete set null,
   selected boolean not null default false,   -- auf der Einkaufsliste (Favorit angetickt)
   checked boolean not null default false,    -- gekauft/abgehakt
+  qty integer not null default 1,            -- Anzahl (Gastronomie-Seiten)
   created_at timestamptz not null default now(),
   unique (product_id, user_id)
 );
 alter table public."lata-wishes" alter column selected set default false;
+alter table public."lata-wishes" add column if not exists qty integer not null default 1;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'lata-wishes_qty_range') then
+    alter table public."lata-wishes" add constraint "lata-wishes_qty_range" check (qty between 1 and 99);
+  end if;
+end $$;
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'lata-wishes_checked_needs_selected') then
     alter table public."lata-wishes" add constraint "lata-wishes_checked_needs_selected" check (not checked or selected);
@@ -238,7 +245,7 @@ begin
   if auth.uid() is null or current_user not in ('authenticated', 'anon') then return new; end if;
   if new.product_id <> old.product_id or new.user_id <> old.user_id then raise exception 'NEED_FORBIDDEN'; end if;
   if auth.uid() = old.user_id then return new; end if;   -- die Person ändert ihren Wunsch frei; alle anderen dürfen nur abhaken
-  if new.selected <> old.selected or new.note is distinct from old.note or new.list_id is distinct from old.list_id then
+  if new.selected <> old.selected or new.note is distinct from old.note or new.list_id is distinct from old.list_id or new.qty <> old.qty then
     raise exception 'NEED_FORBIDDEN';
   end if;
   return new;

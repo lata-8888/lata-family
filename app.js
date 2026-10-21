@@ -790,6 +790,16 @@
   // Eine Zeile in der Oberfläche heisst «Item»: { p: Produkt, w: mein Wunsch oder null, ws: Wünsche der Zeile, listId }
   // Einkauf und «Il Mio Quattro» sind zwei Seiten mit demselben Aufbau, aber eigenem Produktkatalog und eigenen Einkaufslisten (Spalte shop)
   function shopKey() { return String(S.tab).indexOf('g:') === 0 ? S.tab.slice(2) : 'einkauf'; }   // Reiter «g:<key>» = Gastronomie, sonst Einkauf
+  function isGastro() { return shopKey() !== 'einkauf'; }
+  function wQty(w) { return Math.max(1, w.qty || 1); }
+  function fmtMoney(n) { return 'CHF ' + n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  // Anzahl und Summe der Preise einer Gruppe von Zeilen (Gastronomie): Anzahl × Preis, über alle Wünschenden
+  function itemTotals(items) {
+    var n = 0, sum = 0;
+    items.forEach(function (it) { it.ws.forEach(function (w) { n += wQty(w); sum += wQty(w) * (Number(it.p.price) || 0); }); });
+    return { n: n, sum: sum };
+  }
+  function totalsLine(items) { var t = itemTotals(items); return items.length ? '<div class="shtotal">' + esc(L('shTotals', { n: t.n, sum: fmtMoney(t.sum) })) + '</div>' : ''; }
   function shopTitle() { var k = shopKey(), g = S.gastros.filter(function (x) { return x.key === k; })[0]; return g ? g.name : L('navShop'); }
   function inShop(x) { return !!x && (x.shop || 'einkauf') === shopKey(); }
   function shopProds() { return S.products.filter(inShop); }
@@ -866,8 +876,11 @@
     var isFav = !!it.w, favLbl = isFav ? L('shFavRemove') : L('shFavAdd');
     var star = '<button type="button" class="hico star' + (isFav ? ' on' : '') + '" data-act="' + (isFav ? 'need-unwish' : 'need-wish') + '" data-id="' + it.p.id + '" aria-pressed="' + isFav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button>';
     var menu = '<button type="button" class="hico" data-act="need-edit" data-id="' + it.p.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>';
+    var qtyN = shop ? it.ws.reduce(function (s, w) { return s + wQty(w); }, 0) : 0;
+    // Gastronomie: in den Favoriten wählt man die Anzahl (− n +), in der Einkaufsliste steht sie als «n×» vor dem Namen
+    var stepper = isGastro() && fav ? '<div class="qtyline"><button type="button" class="qb" data-act="need-qty" data-id="' + it.p.id + '" data-val="-1" aria-label="' + esc(L('shQtyLess')) + '"' + (wQty(it.w) <= 1 ? ' disabled' : '') + '>−</button><i class="qn" aria-live="polite">' + wQty(it.w) + '</i><button type="button" class="qb" data-act="need-qty" data-id="' + it.p.id + '" data-val="1" aria-label="' + esc(L('shQtyMore')) + '"' + (wQty(it.w) >= 99 ? ' disabled' : '') + '>+</button></div>' : '';
     return '<li class="trow shopi' + ((fav ? it.w.checked : shop && bought) ? ' chk' : '') + '">' +
-      '<div class="l"><b>' + lockIcon(it.p) + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
+      '<div class="l"><b>' + (isGastro() && shop ? qtyN + '× ' : '') + lockIcon(it.p) + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span>' + stepper + '</div>' +
       '<div class="btnrow">' + menu + star + '</div>' + (check || '<span class="tspace" aria-hidden="true"></span>') + '</li>';
   }
   function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
@@ -893,7 +906,8 @@
   }  function viewLists() {
     var sel = S.wishes.filter(function (w) { return w.selected && inShop(productById(w.product_id)); });   // nur auf der Wunschliste gewählte Produkte
     var none = groupItems(sel.filter(function (w) { return !w.list_id && w.user_id === S.me.id; }));   // ohne Liste: nur meine
-    var html = accordion('lst-none', L('shNoList'), none.length, ulOf(none.map(function (it) { return needRow(it, 'none'); }), 'shEmpty'));
+    var gastro = isGastro();
+    var html = accordion('lst-none', L('shNoList'), none.length, ulOf(none.map(function (it) { return needRow(it, 'none'); }), 'shEmpty') + (gastro ? totalsLine(none) : ''));
     if (!shopLists().length) html += '<div class="empty"><p>' + esc(L('shNoLists')) + '</p></div>';
     sortedLists().forEach(function (l) {
       var items = groupItems(sel.filter(function (w) { return w.list_id === l.id; }), l.id);   // jedes Produkt einmal, mit den Namen der Wünschenden
@@ -907,8 +921,10 @@
         dots + '<button type="button" class="hico" data-act="list-update" data-id="' + l.id + '" aria-label="' + esc(L('shUpdate')) + '" title="' + esc(L('shUpdate')) + '">' + ICON.refresh + '</button>' +
         '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
         (open ? '<div class="accbody">' + (itemsOpen.length || !itemsDone.length ? ulOf(itemsOpen.map(function (it) { return needRow(it, 'list'); }), 'shEmpty') : '') +
-          (itemsDone.length ? '<ul class="list">' + itemsDone.map(function (it) { return needRow(it, 'list'); }).join('') + '</ul>' : '') + '</div>' : '') + '</section>';
+          (itemsDone.length ? '<ul class="list">' + itemsDone.map(function (it) { return needRow(it, 'list'); }).join('') + '</ul>' : '') + (gastro ? totalsLine(items) : '') + '</div>' : '') + '</section>';
     });
+    // Gastronomie: Gesamtanzahl und Gesamtpreis über alle Listen unten
+    if (gastro) { var allItems = groupItems(sel); if (allItems.length) { var gt = itemTotals(allItems); html += '<section class="card shgrand"><b>' + esc(L('shGrand')) + '</b><span>' + esc(L('shTotals', { n: gt.n, sum: fmtMoney(gt.sum) })) + '</span></section>'; } }
     return html;
   }
   function memberOptions() {
@@ -1444,6 +1460,12 @@
       case 'goto': if (v === 'admin') ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; }); S.tab = v; render(); return window.scrollTo(0, 0);
       case 'sec': S.sec[id] = !(S.sec[id] !== false); return render();
       case 'who': S.open['ev:' + id] = !S.open['ev:' + id]; return render();
+      case 'need-qty': {
+        var qw = myWish(id); if (!qw) return;
+        var nq = Math.max(1, Math.min(99, wQty(qw) + (parseInt(v, 10) || 0)));
+        if (nq === wQty(qw)) return;
+        return act(async function () { var r = await sb.from(T('wishes')).update({ qty: nq }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; });
+      }
       case 'shop-view': S.shopViews[shopKey()] = v; return render();
       case 'list-edit': {
         var el = listById(id); if (!el || el.owner_id !== S.me.id) return;
