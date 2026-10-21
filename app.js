@@ -137,7 +137,7 @@
   S.taskAssign = [];   // Favoriten von Tasks: { task_id, user_id }
   var installEvt = null;
   var isAdmin = function () { return !!(S.me && S.me.is_admin); };
-  var canManageGastro = function () { return !!(S.me && (S.me.is_admin || S.me.is_gastro_manager)); };   // Admin oder Gastro Manager
+  var canManageGastro = function () { return !!(S.me && (S.me.is_admin || S.me.is_gastro_manager)); };   // Admin oder Food Manager
   var canManageEvents = function () { return !!(S.me && (S.me.is_admin || S.me.is_event_manager)); };   // Admin oder Event Manager
   var roleLabels = function (m) {
     var r = [m.is_guest ? L('roleGuest') : L('roleUser')];
@@ -922,7 +922,7 @@
   }
   // Seite «Gastro»: je aktivierter Gastronomie eine zuklappbare Sektion (Klon des Einkaufs mit eigenem Katalog); «+» legt in dieser Sektion ein Produkt bzw. eine Liste an
   function viewGastro() {
-    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navGastro')) + '</h1></div></div>', saved = S.shopCtx;
+    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('titleGastro')) + '</h1></div></div>', saved = S.shopCtx;
     enabledGastros().forEach(function (g) {
       S.shopCtx = g.key;
       var lists = curShopView() === 'lists';
@@ -1094,14 +1094,14 @@
       }).join('') + '</ul>' : '<p class="muted">' + esc(L('gastroEmpty')) + '</p>';
       return accordion('gastro', L('adminGastro'), S.gastros.length, gBody, isAdmin() ? 'gastro-add' : undefined, L('gastroAdd'));
     };
-    // Gäste (für Gastro Manager): Liste und «+» zum Eröffnen eines Gastes
+    // Gäste (für Food Manager): Liste und «+» zum Eröffnen eines Gastes
     var guestSection = function () {
       var gl = S.members.filter(function (m) { return m.is_guest; });
       var body = gl.length ? '<ul class="list">' + gl.map(function (m) { return '<li class="mbrow"><div class="l"><b>' + esc(m.name) + '</b><span>' + esc(fmtPhone(m.phone)) + '</span></div></li>'; }).join('') + '</ul>' : '<p class="muted small">' + esc(L('nobody')) + '</p>';
       return accordion('guests', L('grpGuests'), gl.length, body, 'add-user', L('addGuest'));
     };
     if (canManageEvents()) html += accordion('events', L('adminEvents'), evs.length, evBody, 'ev-new', L('evNew'));
-    if (!isAdmin()) { if (canManageGastro()) html += gastroSection() + guestSection(); return html; }   // Event Manager: nur Events; Gastro Manager: Gastronomien und Gäste
+    if (!isAdmin()) { if (canManageGastro()) html += gastroSection() + guestSection(); return html; }   // Event Manager: nur Events; Food Manager: Gastronomien und Gäste
     var tag = function (cls, label, icon) { return '<span class="mbic ' + cls + '" title="' + esc(label) + '" aria-label="' + esc(label) + '">' + icon + '</span>'; };
     var mbRow = function (m) {
       var self = m.id === S.me.id, lamp = m.pin_changed ? L('pinLampOk') : L('pinLampNo');
@@ -1754,7 +1754,7 @@
         return rpc('admin_update_member', { target: id, new_name: r.name, new_phone: ph }, L('saved'));
       }
       case 'add-user': {
-        var onlyGuest = !isAdmin();   // Gastro Manager eröffnen nur Gäste
+        var onlyGuest = !isAdmin();   // Food Manager eröffnen nur Gäste
         if (onlyGuest && !canManageGastro()) return;
         var f = await askForm(onlyGuest ? L('addGuest') : L('addUser'), [{ name: 'name', label: L('fullName') }, { name: 'phone', label: L('phone'), type: 'phone' }].concat(onlyGuest ? [] : [{ name: 'guest', label: L('guestCheck'), type: 'checkbox' }]), null, L('addUserNote'));
         if (!f) return;

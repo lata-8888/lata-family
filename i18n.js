@@ -1,10 +1,10 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
-    roleGM: 'Gastro Manager', makeGM: 'Zum Gastro Manager machen', revokeGM: 'Gastro Manager entziehen', addGuest: 'Gast hinzufügen',
+    roleGM: 'Food Manager', makeGM: 'Zum Food Manager machen', revokeGM: 'Food Manager entziehen', addGuest: 'Gast hinzufügen',
     shGroup: 'Gruppe',
     shRef: 'ID', shInfo: 'Zutaten', shPrice: 'Preis (CHF)', shPriceBad: 'Bitte einen gültigen Preis eingeben.',
-    navGastro: 'Gastro',
+    navGastro: 'Food', titleGastro: 'Food Delivery',
     shQtyLess: 'Weniger', shQtyMore: 'Mehr', shTotals: 'Anzahl: {n} · Total: {sum}',
     gastroAdd: 'Gastronomie hinzufügen', gastroName: 'Name', gastroEmpty: 'Noch keine Gastronomie.',
     adminGastro: 'Gastronomie',
@@ -69,10 +69,10 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
-    roleGM: 'Gastro Manager', makeGM: 'Make Gastro Manager', revokeGM: 'Revoke Gastro Manager', addGuest: 'Add guest',
+    roleGM: 'Food Manager', makeGM: 'Make Food Manager', revokeGM: 'Revoke Food Manager', addGuest: 'Add guest',
     shGroup: 'Group',
     shRef: 'ID', shInfo: 'Ingredients', shPrice: 'Price (CHF)', shPriceBad: 'Please enter a valid price.',
-    navGastro: 'Gastro',
+    navGastro: 'Food', titleGastro: 'Food Delivery',
     shQtyLess: 'Fewer', shQtyMore: 'More', shTotals: 'Count: {n} · Total: {sum}',
     gastroAdd: 'Add gastronomy', gastroName: 'Name', gastroEmpty: 'No gastronomy yet.',
     adminGastro: 'Gastronomy',
@@ -137,10 +137,10 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
-    roleGM: 'Gastro Manager', makeGM: 'Gastro Manager maken', revokeGM: 'Gastro Manager intrekken', addGuest: 'Gast toevoegen',
+    roleGM: 'Food Manager', makeGM: 'Food Manager maken', revokeGM: 'Food Manager intrekken', addGuest: 'Gast toevoegen',
     shGroup: 'Groep',
     shRef: 'ID', shInfo: 'Ingrediënten', shPrice: 'Prijs (CHF)', shPriceBad: 'Voer een geldige prijs in.',
-    navGastro: 'Gastro',
+    navGastro: 'Food', titleGastro: 'Food Delivery',
     shQtyLess: 'Minder', shQtyMore: 'Meer', shTotals: 'Aantal: {n} · Totaal: {sum}',
     gastroAdd: 'Gastronomie toevoegen', gastroName: 'Naam', gastroEmpty: 'Nog geen gastronomie.',
     adminGastro: 'Gastronomie',
