@@ -107,16 +107,26 @@ create table if not exists public."lata-shop_lists" (
   name text not null check (char_length(name) between 1 and 60),
   owner_id uuid not null references public."lata-profiles"(id),
   is_private boolean not null default false,
+  shop text not null default 'einkauf',
   created_at timestamptz not null default now()
 );
+alter table public."lata-shop_lists" add column if not exists shop text not null default 'einkauf';
 -- Produktkatalog: jedes Produkt genau einmal (Name ohne Gross-/Kleinschreibung und Randleerzeichen eindeutig)
 create table if not exists public."lata-products" (
   id uuid primary key default gen_random_uuid(),
   name text not null check (char_length(name) between 1 and 80),
   created_by uuid references public."lata-profiles"(id) on delete set null,
   is_private boolean not null default false,   -- privat: nur für die Person sichtbar, die das Produkt angelegt hat
+  shop text not null default 'einkauf',        -- Seite: 'einkauf' oder 'ilmio' (Il Mio Quattro, Pizzakarte)
+  ref text,                                    -- externe Nummer (vorerst unsichtbar)
+  info text,                                   -- Zutaten
+  price numeric(8,2),
   created_at timestamptz not null default now()
 );
+alter table public."lata-products" add column if not exists shop text not null default 'einkauf';
+alter table public."lata-products" add column if not exists ref text;
+alter table public."lata-products" add column if not exists info text;
+alter table public."lata-products" add column if not exists price numeric(8,2);
 alter table public."lata-products" add column if not exists is_private boolean not null default false;
 drop index if exists public."lata-products_name_key";
 -- öffentlich global eindeutig, privat je Person eindeutig
@@ -442,20 +452,22 @@ end; $$;
 create or replace trigger guard_product_private before update on public."lata-products" for each row execute function public.lata_guard_product_private();
 
 -- Produkt (falls neu) anlegen und für die gewählten Personen (Standard: ich) zum Favoriten machen (nicht angetickt). Gibt die Produkt-ID zurück.
-create or replace function public.lata_add_product(p_name text, p_note text, p_list uuid, p_users uuid[], p_private boolean default false) returns uuid
+-- Produkt (falls neu) in der Seite p_shop anlegen und für die gewählten Personen zum Favoriten machen
+create or replace function public.lata_add_product_in(p_shop text, p_name text, p_note text, p_list uuid, p_users uuid[], p_private boolean default false) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid; u uuid; users uuid[]; pub boolean; priv boolean := coalesce(p_private, false);
 begin
   if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
+  if p_shop not in ('einkauf', 'ilmio') then raise exception 'Unbekannte Seite'; end if;
   if char_length(nm) not between 1 and 80 then raise exception 'Name fehlt'; end if;
   if not public.lata_can_see_list(p_list) then raise exception 'NEED_FORBIDDEN'; end if;
   pub := not priv and (p_list is null or exists (select 1 from public."lata-shop_lists" where id = p_list and not is_private));
-  select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end);
+  select id into pid from public."lata-products" where shop = p_shop and lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end);
   if pid is null then
-    insert into public."lata-products" (name, created_by, is_private) values (nm, me, priv) on conflict do nothing returning id into pid;
-    if pid is null then select id into pid from public."lata-products" where lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end); end if;
+    insert into public."lata-products" (shop, name, created_by, is_private) values (p_shop, nm, me, priv) on conflict do nothing returning id into pid;
+    if pid is null then select id into pid from public."lata-products" where shop = p_shop and lower(btrim(name)) = lower(nm) and (case when priv then is_private and created_by = me else not is_private end); end if;
   end if;
-  users := case when priv or p_users is null then array[me] else p_users end;   -- privat: nur ich
+  users := case when priv or p_users is null then array[me] else p_users end;
   foreach u in array users loop
     if not exists (select 1 from public."lata-profiles" where id = u) then raise exception 'Person nicht gefunden'; end if;
     insert into public."lata-wishes" (product_id, user_id, created_by, note, list_id, selected)
@@ -464,6 +476,8 @@ begin
   end loop;
   return pid;
 end; $$;
+create or replace function public.lata_add_product(p_name text, p_note text, p_list uuid, p_users uuid[], p_private boolean default false) returns uuid
+language sql security definer set search_path = public as $$ select public.lata_add_product_in('einkauf', p_name, p_note, p_list, p_users, p_private) $$;
 create or replace function public.lata_add_wish(p_name text, p_note text, p_list uuid, p_users uuid[]) returns uuid
 language sql security definer set search_path = public as $$ select public.lata_add_product(p_name, p_note, p_list, p_users, false) $$;
 

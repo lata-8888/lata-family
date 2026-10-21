@@ -129,7 +129,7 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], modules: {}, shopView: 'need', tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], modules: {}, shopViews: {}, tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
   var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'gastro', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
@@ -788,10 +788,16 @@
   /* ---------- Einkauf: Produktkatalog (jedes Produkt genau einmal) und Wünsche pro Person ---------- */
   // lata-products: ein Eintrag je Produkt. lata-wishes: eine Person führt ein Produkt auf ihrer Wunschliste (Notiz, Liste, ausgewählt, abgehakt).
   // Eine Zeile in der Oberfläche heisst «Item»: { p: Produkt, w: mein Wunsch oder null, ws: Wünsche der Zeile, listId }
+  // Einkauf und «Il Mio Quattro» sind zwei Seiten mit demselben Aufbau, aber eigenem Produktkatalog und eigenen Einkaufslisten (Spalte shop)
+  function shopKey() { return S.tab === 'ilmio' ? 'ilmio' : 'einkauf'; }
+  function inShop(x) { return !!x && (x.shop || 'einkauf') === shopKey(); }
+  function shopProds() { return S.products.filter(inShop); }
+  function shopLists() { return S.lists.filter(inShop); }
+  function curShopView() { return S.shopViews[shopKey()] === 'lists' ? 'lists' : 'need'; }
   function listById(id) { return S.lists.filter(function (x) { return x.id === id; })[0] || null; }
   function byName(a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); }
   function byItem(a, b) { return byName(a.p, b.p); }
-  function sortedLists() { return S.lists.slice().sort(byName); }   // Listen immer alphabetisch
+  function sortedLists() { return shopLists().sort(byName); }   // Listen immer alphabetisch
   // «Einkaufslisten» als farbige Kacheln (eine Auswahl): Leer | Listen … | + Neue Liste (führt in den Dialog)
   function listField(value) {
     var opts = [{ v: '', c: 'var(--muted)', l: L('shListNone') }];
@@ -806,7 +812,7 @@
       { name: 'is_private', label: L('privLabel'), type: 'checkbox', value: false }
     ]);
     if (!lf || !lf.name) return null;
-    var r = await sb.from(T('shop_lists')).insert({ name: lf.name, owner_id: S.me.id, is_private: !!lf.is_private }).select('id').single();
+    var r = await sb.from(T('shop_lists')).insert({ name: lf.name, owner_id: S.me.id, is_private: !!lf.is_private, shop: shopKey() }).select('id').single();
     if (r.error) { console.error(r.error); toast(errText(r.error)); return null; }
     return r.data.id;
   }
@@ -836,6 +842,7 @@
   }
   function needMeta(it, mode) {
     var parts = [], notes = [];
+    if (it.p.info) parts.push(esc(it.p.info));   // «Il Mio Quattro»: Zutaten unter dem Namen
     if (mode !== 'more') it.ws.forEach(function (x) { if (x.note && notes.indexOf(x.note) < 0) notes.push(x.note); });
     notes.forEach(function (n) { parts.push(esc(n)); });
     // wer das Produkt sonst noch als Favorit führt (Weitere Produkte) bzw. wer es in der Einkaufsliste braucht
@@ -864,8 +871,8 @@
   }
   function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
   function viewShop() {
-    var needView = S.shopView !== 'lists';
-    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1></div>' +
+    var needView = curShopView() !== 'lists';
+    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L(shopKey() === 'ilmio' ? 'navIlMio' : 'navShop')) + '</h1></div>' +
       (needView ? '<button type="button" class="hico addbtn" data-act="need-new" aria-label="' + esc(L('shAdd')) + '" title="' + esc(L('shAdd')) + '">' + ICON.plus + '</button>' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shListAdd')) + '" title="' + esc(L('shListAdd')) + '">' + ICON.plus + '</button>') + '</div>';
     // zwei Register (Tabs) statt Knöpfe
     var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
@@ -876,17 +883,17 @@
     var uid = S.me.id;
     // Meine Favoriten: meine Wünsche, alphabetisch; das Kästchen setzt ein Produkt auf die Einkaufsliste
     var favs = S.wishes.filter(function (w) { return w.user_id === uid; }).map(function (w) { return { p: productById(w.product_id), w: w, ws: [w], listId: w.list_id || '' }; })
-      .filter(function (it) { return it.p; }).sort(byItem);
+      .filter(function (it) { return it.p && inShop(it.p); }).sort(byItem);
     // Weitere Produkte: alle übrigen Produkte (auch ohne Wünsche); «+» legt ein neues Produkt an
     var mine = {}; favs.forEach(function (it) { mine[it.p.id] = true; });
-    var more = S.products.filter(function (p) { return !mine[p.id]; }).map(function (p) { return { p: p, w: null, ws: S.wishes.filter(function (w) { return w.product_id === p.id; }), listId: '' }; }).sort(byItem);
+    var more = shopProds().filter(function (p) { return !mine[p.id]; }).map(function (p) { return { p: p, w: null, ws: S.wishes.filter(function (w) { return w.product_id === p.id; }), listId: '' }; }).sort(byItem);
     return accordion('need-open', L('shFavs'), favs.length, ulOf(favs.map(function (it) { return needRow(it, 'fav'); }), 'shEmpty')) +
       accordion('need-others', L('shMore'), more.length, ulOf(more.map(function (it) { return needRow(it, 'more'); }), 'shMoreEmpty'));
   }  function viewLists() {
-    var sel = S.wishes.filter(function (w) { return w.selected; });   // nur auf der Wunschliste gewählte Produkte
+    var sel = S.wishes.filter(function (w) { return w.selected && inShop(productById(w.product_id)); });   // nur auf der Wunschliste gewählte Produkte
     var none = groupItems(sel.filter(function (w) { return !w.list_id && w.user_id === S.me.id; }));   // ohne Liste: nur meine
     var html = accordion('lst-none', L('shNoList'), none.length, ulOf(none.map(function (it) { return needRow(it, 'none'); }), 'shEmpty'));
-    if (!S.lists.length) html += '<div class="empty"><p>' + esc(L('shNoLists')) + '</p></div>';
+    if (!shopLists().length) html += '<div class="empty"><p>' + esc(L('shNoLists')) + '</p></div>';
     sortedLists().forEach(function (l) {
       var items = groupItems(sel.filter(function (w) { return w.list_id === l.id; }), l.id);   // jedes Produkt einmal, mit den Namen der Wünschenden
       var isDone = function (it) { return it.ws.every(function (x) { return x.checked; }); };
@@ -912,11 +919,11 @@
     name = String(name || '').trim();
     if (!name) return toast(L('shMissing'));
     var low = name.toLowerCase(), users = extra.users || [];
-    var prod = S.products.filter(function (p) { return p.name.trim().toLowerCase() === low && !!p.is_private === !!extra.private; })[0];
+    var prod = shopProds().filter(function (p) { return p.name.trim().toLowerCase() === low && !!p.is_private === !!extra.private; })[0];
     // gibt es das Produkt schon und niemand Neues wird Favorit, ist nichts zu tun
     if (prod && !users.some(function (u) { return !S.wishes.some(function (w) { return w.product_id === prod.id && w.user_id === u; }); })) return toast(L('shAlready'));
     return act(async function () {
-      var r = await sb.rpc(F('add_product'), { p_name: name, p_note: extra.note || null, p_list: extra.list_id || null, p_users: extra.private ? [S.me.id] : users, p_private: !!extra.private });
+      var r = await sb.rpc(F('add_product_in'), { p_shop: shopKey(), p_name: name, p_note: extra.note || null, p_list: extra.list_id || null, p_users: extra.private ? [S.me.id] : users, p_private: !!extra.private });
       if (r.error) throw r.error;
     });
   }
@@ -941,11 +948,8 @@
     return (await resolveListChoice(fr)) ? fr : null;
   }
 
-  // Hauptseite «Il Mio Quattro» (Gastronomie) – nur sichtbar, wenn der Admin das Modul aktiviert hat
-  function viewIlMio() {
-    return '<div class="top"><div><h1 class="pagetitle">' + esc(L('navIlMio')) + '</h1></div></div>' +
-      '<section class="card"><p class="muted">' + esc(L('ilmSoon')) + '</p></section>';
-  }
+  // Hauptseite «Il Mio Quattro» (Gastronomie): Klon der Seite «Einkauf» mit eigenem Katalog (Pizzakarte); nur sichtbar, wenn der Admin das Modul aktiviert hat
+  function viewIlMio() { return viewShop(); }
 
   function viewProfile() {
     var opt = function (v, l) { return '<button type="button" class="segbtn' + (theme === v ? ' on' : '') + '" data-act="set-theme" data-val="' + v + '" aria-pressed="' + (theme === v) + '">' + esc(l) + '</button>'; };
@@ -1442,7 +1446,7 @@
       case 'goto': if (v === 'admin') ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; }); S.tab = v; render(); return window.scrollTo(0, 0);
       case 'sec': S.sec[id] = !(S.sec[id] !== false); return render();
       case 'who': S.open['ev:' + id] = !S.open['ev:' + id]; return render();
-      case 'shop-view': S.shopView = v; return render();
+      case 'shop-view': S.shopViews[shopKey()] = v; return render();
       case 'list-edit': {
         var el = listById(id); if (!el || el.owner_id !== S.me.id) return;
         var ef = await askForm(L('shListEdit'), [{ name: 'name', label: L('shListName'), value: el.name }, { name: 'is_private', label: L('privLabel'), type: 'checkbox', value: !!el.is_private }], null, null, L('del'));
@@ -1457,7 +1461,7 @@
       }
       case 'need-new': {
         // neues Produkt; die Vorschläge zeigen den ganzen Katalog, «in deinen Favoriten» = ich führe es bereits
-        var known = S.products.slice().sort(byName).map(function (p) { return { n: p.name, on: !!myWish(p.id) }; });
+        var known = shopProds().sort(byName).map(function (p) { return { n: p.name, on: !!myWish(p.id) }; });
         var nf = await askForm(L('shAdd'), [
           { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList'), inline: true },
           { name: 'note', label: L('shNote'), inline: true },
@@ -1510,7 +1514,7 @@
       }
       case 'need-wish': {
         var wp = productById(id); if (!wp) return;
-        return act(async function () { var r = await sb.rpc(F('add_wish'), { p_name: wp.name, p_note: null, p_list: null, p_users: [S.me.id] }); if (r.error) throw r.error; }, L('saved'));
+        return act(async function () { var r = await sb.rpc(F('add_product_in'), { p_shop: wp.shop || 'einkauf', p_name: wp.name, p_note: null, p_list: null, p_users: [S.me.id], p_private: !!wp.is_private }); if (r.error) throw r.error; }, L('saved'));
       }
       case 'need-unwish':
         return act(async function () { var r = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error; }, L('saved'));
@@ -1535,7 +1539,7 @@
           var sel = isPriv ? [S.me.id] : (nfe.users || []), addU = sel.filter(function (u) { return !had[u]; });
           // Notiz/Liste angegeben, aber niemand gewählt und noch kein eigener Favorit: der Favorit wird für mich angelegt
           if (!had[S.me.id] && !addU.length && (nfe.note || nfe.list_id)) addU = [S.me.id];
-          if (addU.length) { var ra = await sb.rpc(F('add_product'), { p_name: newName, p_note: nfe.note || null, p_list: nfe.list_id || null, p_users: addU, p_private: isPriv }); if (ra.error) throw ra.error; }
+          if (addU.length) { var ra = await sb.rpc(F('add_product_in'), { p_shop: shopKey(), p_name: newName, p_note: nfe.note || null, p_list: nfe.list_id || null, p_users: addU, p_private: isPriv }); if (ra.error) throw ra.error; }
           if (had[S.me.id] && sel.indexOf(S.me.id) < 0) {   // mich abgewählt: mein Favorit entfällt
             var rd = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (rd.error) throw rd.error;
           } else if (had[S.me.id]) {

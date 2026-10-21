@@ -1,7 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
-    navIlMio: 'Il Mio Quattro', adminGastro: 'Gastronomie', ilmSoon: 'Hier entsteht die Seite von Il Mio Quattro.',
+    navIlMio: 'Il Mio Quattro', adminGastro: 'Gastronomie',
     shListAdd: 'Einkaufsliste hinzufügen', shListEdit: 'Einkaufsliste bearbeiten', userEdit: 'Person bearbeiten', profNameTitle: 'Name ändern', profPhoneTitle: 'Handynummer ändern',
     taskTabOpen: 'Offen', taskTabOthers: 'Andere', taskReactivate: 'Wieder aktivieren',
     evToCal: 'Zum Kalender hinzufügen (Outlook, Apple Kalender)',
@@ -63,7 +63,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
-    navIlMio: 'Il Mio Quattro', adminGastro: 'Gastronomy', ilmSoon: 'The Il Mio Quattro page is coming here.',
+    navIlMio: 'Il Mio Quattro', adminGastro: 'Gastronomy',
     shListAdd: 'Add shopping list', shListEdit: 'Edit shopping list', userEdit: 'Edit person', profNameTitle: 'Change name', profPhoneTitle: 'Change phone number',
     taskTabOpen: 'Open', taskTabOthers: 'Others', taskReactivate: 'Reactivate',
     evToCal: 'Add to calendar (Outlook, Apple Calendar)',
@@ -125,7 +125,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
-    navIlMio: 'Il Mio Quattro', adminGastro: 'Gastronomie', ilmSoon: 'Hier komt de pagina van Il Mio Quattro.',
+    navIlMio: 'Il Mio Quattro', adminGastro: 'Gastronomie',
     shListAdd: 'Boodschappenlijst toevoegen', shListEdit: 'Boodschappenlijst bewerken', userEdit: 'Persoon bewerken', profNameTitle: 'Naam wijzigen', profPhoneTitle: 'Telefoonnummer wijzigen',
     taskTabOpen: 'Open', taskTabOthers: 'Overige', taskReactivate: 'Opnieuw activeren',
     evToCal: 'Aan agenda toevoegen (Outlook, Apple Agenda)',
