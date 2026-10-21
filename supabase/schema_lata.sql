@@ -22,6 +22,7 @@ create table if not exists public."lata-profiles" (
   created_at timestamptz not null default now(),
   is_guest boolean not null default false,
   is_event_manager boolean not null default false,
+  is_gastro_manager boolean not null default false,   -- darf Gastronomien ein-/ausschalten und Gäste eröffnen
   design text check (design is null or design in ('standard','holland','light','petrol'))
 );
 
@@ -199,6 +200,10 @@ create or replace function public.lata_is_user() returns boolean language sql st
 $$ select exists (select 1 from public."lata-profiles" where id = auth.uid()) $$;
 create or replace function public.lata_can_manage_events() returns boolean language sql stable security definer set search_path = public as
 $$ select coalesce((select is_admin or is_event_manager from public."lata-profiles" where id = auth.uid()), false) $$;
+create or replace function public.lata_can_manage_gastro() returns boolean language sql stable security definer set search_path = public as
+$$ select coalesce((select is_admin or is_gastro_manager from public."lata-profiles" where id = auth.uid()), false) $$;
+create or replace function public.lata_is_member() returns boolean language sql stable security definer set search_path = public as   -- Mitglied = kein Gast
+$$ select exists (select 1 from public."lata-profiles" where id = auth.uid() and not is_guest) $$;
 create or replace function public.lata_app_design() returns text language sql stable security definer set search_path = public as
 $$ select coalesce((select value from public."lata-app_settings" where key = 'design'), 'standard') $$;
 create or replace function public.lata_app_language() returns text language sql stable security definer set search_path = public as
@@ -319,7 +324,7 @@ create or replace function public.lata_admin_create_user(p_name text, p_phone te
 language plpgsql security definer set search_path = public as $$
 declare uid uuid;
 begin
-  if not public.lata_is_admin() then raise exception 'Nur Admins'; end if;
+  if not (public.lata_is_admin() or (public.lata_can_manage_gastro() and coalesce(p_guest, false))) then raise exception 'Nur Admins'; end if;   -- Gastro Manager dürfen nur Gäste eröffnen
   if trim(coalesce(p_name, '')) = '' then raise exception 'Name fehlt'; end if;
   if coalesce(p_phone, '') !~ '^\+[0-9]{9,15}$' then raise exception 'Ungültige Handynummer'; end if;
   if exists (select 1 from public."lata-profiles" where phone = p_phone) then raise exception 'PHONE_TAKEN'; end if;
@@ -428,11 +433,18 @@ begin
   update public."lata-profiles" set is_event_manager = flag, is_guest = case when flag then false else is_guest end where id = target;
 end; $$;
 
+create or replace function public.lata_set_gastro_manager(target uuid, flag boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.lata_is_admin() then raise exception 'Nur Admins'; end if;
+  update public."lata-profiles" set is_gastro_manager = flag, is_guest = case when flag then false else is_guest end where id = target;
+end; $$;
+
 create or replace function public.lata_set_guest(target uuid, flag boolean) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   if not public.lata_is_admin() then raise exception 'Nur Admins'; end if;
-  if flag and exists (select 1 from public."lata-profiles" where id = target and (is_admin or is_event_manager or phone = public.lata_default_admin_phone())) then
+  if flag and exists (select 1 from public."lata-profiles" where id = target and (is_admin or is_event_manager or is_gastro_manager or phone = public.lata_default_admin_phone())) then
     raise exception 'GUEST_NOT_ALLOWED';
   end if;
   update public."lata-profiles" set is_guest = flag where id = target;
@@ -559,7 +571,7 @@ end; $$;
 create or replace function public.lata_set_gastro(p_key text, p_on boolean) returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  if not public.lata_is_admin() then raise exception 'Nur Admins'; end if;
+  if not public.lata_can_manage_gastro() then raise exception 'Nur Admins und Gastro Manager'; end if;
   update public."lata-gastros" set enabled = coalesce(p_on, false) where key = p_key;
   if not found then raise exception 'Unbekannte Gastronomie'; end if;
 end; $$;
@@ -601,12 +613,12 @@ create policy profiles_select     on public."lata-profiles" for select to authen
 create policy profiles_update_own on public."lata-profiles" for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
 
 create policy events_select on public."lata-events" for select to authenticated
-  using (public.lata_is_user() and (not is_private or created_by = auth.uid()));
+  using (public.lata_is_member() and (not is_private or created_by = auth.uid()));
 create policy events_manage on public."lata-events" for all to authenticated
   using (public.lata_can_manage_events() and (not is_private or created_by = auth.uid()))
   with check (public.lata_can_manage_events() and (not is_private or created_by = auth.uid()));
 create policy event_assignees_select on public."lata-event_assignees" for select to authenticated
-  using (public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id));
+  using (public.lata_is_member() and exists (select 1 from public."lata-events" e where e.id = event_id));
 create policy event_assignees_manage on public."lata-event_assignees" for all to authenticated
   using (public.lata_can_manage_events() and exists (select 1 from public."lata-events" e where e.id = event_id))
   with check (public.lata_can_manage_events() and exists (select 1 from public."lata-events" e where e.id = event_id and (not e.is_private or user_id = auth.uid())));
@@ -617,22 +629,22 @@ create policy event_assignees_own_write on public."lata-event_assignees" for all
   using (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id))
   with check (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id));
 create policy event_responses_select on public."lata-event_responses" for select to authenticated
-  using (public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id));
+  using (public.lata_is_member() and exists (select 1 from public."lata-events" e where e.id = event_id));
 create policy event_responses_own_write on public."lata-event_responses" for all to authenticated
   using (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id))
   with check (user_id = auth.uid() and public.lata_is_user() and exists (select 1 from public."lata-events" e where e.id = event_id));
 
 -- Tasks sind für alle sichtbar; ändern: Ersteller/in und Admins; erledigen zusätzlich die zugeteilten Personen
 create policy tasks_select on public."lata-tasks" for select to authenticated
-  using (public.lata_is_user() and (not is_private or created_by = auth.uid()));
-create policy tasks_insert on public."lata-tasks" for insert to authenticated with check (public.lata_is_user() and created_by = auth.uid());
+  using (public.lata_is_member() and (not is_private or created_by = auth.uid()));
+create policy tasks_insert on public."lata-tasks" for insert to authenticated with check (public.lata_is_member() and created_by = auth.uid());
 create policy tasks_update on public."lata-tasks" for update to authenticated
   using (public.lata_is_user() and (not is_private or created_by = auth.uid()) and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()))
   with check (public.lata_is_user() and (not is_private or created_by = auth.uid()) and (created_by = auth.uid() or public.lata_is_task_assignee(id) or public.lata_is_admin()));
 create policy tasks_delete on public."lata-tasks" for delete to authenticated
   using (created_by = auth.uid() or (public.lata_is_admin() and not is_private));
 create policy task_assignees_select on public."lata-task_assignees" for select to authenticated
-  using (public.lata_is_user() and exists (select 1 from public."lata-tasks" t where t.id = task_id));
+  using (public.lata_is_member() and exists (select 1 from public."lata-tasks" t where t.id = task_id));
 create policy task_assignees_add_any on public."lata-task_assignees" for insert to authenticated
   with check (public.lata_is_user() and exists (select 1 from public."lata-tasks" t where t.id = task_id and (not t.is_private or user_id = auth.uid())));   -- «Favorit für»: andere hinzufügen
 create policy task_assignees_own_write on public."lata-task_assignees" for all to authenticated

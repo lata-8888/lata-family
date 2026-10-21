@@ -1,6 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    roleGM: 'Gastro Manager', makeGM: 'Zum Gastro Manager machen', revokeGM: 'Gastro Manager entziehen', addGuest: 'Gast hinzufügen',
     shGroup: 'Gruppe',
     shRef: 'ID', shInfo: 'Zutaten', shPrice: 'Preis (CHF)', shPriceBad: 'Bitte einen gültigen Preis eingeben.',
     navGastro: 'Gastro',
@@ -68,6 +69,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    roleGM: 'Gastro Manager', makeGM: 'Make Gastro Manager', revokeGM: 'Revoke Gastro Manager', addGuest: 'Add guest',
     shGroup: 'Group',
     shRef: 'ID', shInfo: 'Ingredients', shPrice: 'Price (CHF)', shPriceBad: 'Please enter a valid price.',
     navGastro: 'Gastro',
@@ -135,6 +137,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    roleGM: 'Gastro Manager', makeGM: 'Gastro Manager maken', revokeGM: 'Gastro Manager intrekken', addGuest: 'Gast toevoegen',
     shGroup: 'Groep',
     shRef: 'ID', shInfo: 'Ingrediënten', shPrice: 'Prijs (CHF)', shPriceBad: 'Voer een geldige prijs in.',
     navGastro: 'Gastro',

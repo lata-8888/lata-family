@@ -131,17 +131,19 @@
   /* ---------- Zustand ---------- */
   var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], gastros: [], shopViews: {}, tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
-  var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'gastro', 'g-user', 'g-guest'];
+  var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'gastro', 'guests', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
   S.assign = [];   // Zuteilung von Events an Personen: { event_id, user_id }
   S.taskAssign = [];   // Favoriten von Tasks: { task_id, user_id }
   var installEvt = null;
   var isAdmin = function () { return !!(S.me && S.me.is_admin); };
+  var canManageGastro = function () { return !!(S.me && (S.me.is_admin || S.me.is_gastro_manager)); };   // Admin oder Gastro Manager
   var canManageEvents = function () { return !!(S.me && (S.me.is_admin || S.me.is_event_manager)); };   // Admin oder Event Manager
   var roleLabels = function (m) {
     var r = [m.is_guest ? L('roleGuest') : L('roleUser')];
     if (m.is_admin) r.push(L('roleAdmin'));
     if (m.is_event_manager) r.push(L('roleEM'));
+    if (m.is_gastro_manager) r.push(L('roleGM'));
     return r;
   };
 
@@ -1085,14 +1087,27 @@
         '<div class="btnrow"><button type="button" class="hico" data-act="ev-edit" data-id="' + e.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
         '<button type="button" class="hico star' + (isFavEvent(e.id) ? ' on' : '') + '" data-act="ev-fav" data-id="' + e.id + '" aria-pressed="' + isFavEvent(e.id) + '" aria-label="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '" title="' + esc(L(isFavEvent(e.id) ? 'evUnfav' : 'evFav')) + '">' + ICON.star + '</button></div></li>';
     }).join('') + '</ul>' : '<p class="muted">' + esc(L('evAdminEmpty')) + '</p>';
-    html += accordion('events', L('adminEvents'), evs.length, evBody, 'ev-new', L('evNew'));
-    if (!isAdmin()) return html;   // Event Manager sehen nur die Events
+    // Gastronomien: je ein Schalter, der die Hauptseite (Klon des Einkaufs mit eigenem Katalog) ein-/ausblendet; neue anlegen nur Admins
+    var gastroSection = function () {
+      var gBody = S.gastros.length ? '<ul class="list">' + S.gastros.map(function (g) {
+        return '<li class="modrow"><div class="l"><b>' + esc(g.name) + '</b></div><button type="button" role="switch" class="switch' + (g.enabled ? ' on' : '') + '" data-act="gastro" data-id="' + esc(g.key) + '" data-val="' + (g.enabled ? '0' : '1') + '" aria-checked="' + !!g.enabled + '" aria-label="' + esc(g.name) + '"><i></i></button></li>';
+      }).join('') + '</ul>' : '<p class="muted">' + esc(L('gastroEmpty')) + '</p>';
+      return accordion('gastro', L('adminGastro'), S.gastros.length, gBody, isAdmin() ? 'gastro-add' : undefined, L('gastroAdd'));
+    };
+    // Gäste (für Gastro Manager): Liste und «+» zum Eröffnen eines Gastes
+    var guestSection = function () {
+      var gl = S.members.filter(function (m) { return m.is_guest; });
+      var body = gl.length ? '<ul class="list">' + gl.map(function (m) { return '<li class="mbrow"><div class="l"><b>' + esc(m.name) + '</b><span>' + esc(fmtPhone(m.phone)) + '</span></div></li>'; }).join('') + '</ul>' : '<p class="muted small">' + esc(L('nobody')) + '</p>';
+      return accordion('guests', L('grpGuests'), gl.length, body, 'add-user', L('addGuest'));
+    };
+    if (canManageEvents()) html += accordion('events', L('adminEvents'), evs.length, evBody, 'ev-new', L('evNew'));
+    if (!isAdmin()) { if (canManageGastro()) html += gastroSection() + guestSection(); return html; }   // Event Manager: nur Events; Gastro Manager: Gastronomien und Gäste
     var tag = function (cls, label, icon) { return '<span class="mbic ' + cls + '" title="' + esc(label) + '" aria-label="' + esc(label) + '">' + icon + '</span>'; };
     var mbRow = function (m) {
       var self = m.id === S.me.id, lamp = m.pin_changed ? L('pinLampOk') : L('pinLampNo');
       return '<li class="mbrow"><div class="l"><b>' + esc(m.name) + ' <span class="pinlamp ' + (m.pin_changed ? 'ok' : 'no') + '" title="' + esc(lamp) + '" aria-label="' + esc(lamp) + '"></span>' +
         (self ? ' <span class="mbyou">' + esc(L('you')) + '</span>' : '') + '</b><span>' + esc(fmtPhone(m.phone)) + '</span></div>' +
-        '<span class="mbicons">' + (m.is_admin ? tag('adm', L('roleAdmin'), ICON.gear) : '') + (m.is_event_manager ? tag('em', L('roleEM'), ICON.cal) : '') + '</span>' +
+        '<span class="mbicons">' + (m.is_admin ? tag('adm', L('roleAdmin'), ICON.gear) : '') + (m.is_event_manager ? tag('em', L('roleEM'), ICON.cal) : '') + (m.is_gastro_manager ? tag('em', L('roleGM'), ICON.food) : '') + '</span>' +
         '<button type="button" class="hico" data-act="mb-menu" data-id="' + esc(m.id) + '" aria-label="' + esc(L('actions') + ': ' + m.name) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button></li>';
     };
     // Zwei Gruppen: User und Gäste (klappbar wie die Gruppen in der FBRO-App)
@@ -1118,11 +1133,7 @@
         '<span class="nm"><b>' + esc(L('design_' + d.id)) + '</b><span>' + esc(L('design_' + d.id + '_d')) + '</span></span>' +
         (on ? '<span class="ok">' + ICON.check + '</span>' : '') + '</button>';
     }).join('');
-    // Hauptgruppe «Gastronomie»: je Gastronomie ein Schalter, der ihre Hauptseite (Klon des Einkaufs mit eigenem Katalog) ein-/ausblendet
-    var gBody = S.gastros.length ? '<ul class="list">' + S.gastros.map(function (g) {
-      return '<li class="modrow"><div class="l"><b>' + esc(g.name) + '</b></div><button type="button" role="switch" class="switch' + (g.enabled ? ' on' : '') + '" data-act="gastro" data-id="' + esc(g.key) + '" data-val="' + (g.enabled ? '0' : '1') + '" aria-checked="' + !!g.enabled + '" aria-label="' + esc(g.name) + '"><i></i></button></li>';
-    }).join('') + '</ul>' : '<p class="muted">' + esc(L('gastroEmpty')) + '</p>';
-    html += accordion('gastro', L('adminGastro'), S.gastros.length, gBody, 'gastro-add', L('gastroAdd'));
+    html += gastroSection();
     html += accordion('design', L('designDefault'), null, dsg);
     // Standardsprache der App (nur Admins); Personen können sie im Profil überschreiben
     var lng = '<p class="muted small" style="margin-bottom:10px">' + esc(L('langHint')) + '</p>' + LANGS.map(function (l) {
@@ -1153,6 +1164,7 @@
     wrap.innerHTML = '<div class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(m.name) + '"><h3>' + esc(m.name) + '</h3><div class="menu">' +
       (!self ? b('admin', m.is_admin ? L('revokeAdmin') : L('makeAdmin'), 'ghost', !m.is_admin) : '') +
       b('em', m.is_event_manager ? L('revokeEM') : L('makeEM'), 'ghost', !m.is_event_manager) +
+      b('gm', m.is_gastro_manager ? L('revokeGM') : L('makeGM'), 'ghost', !m.is_gastro_manager) +
       b('guest', m.is_guest ? L('makeUser') : L('makeGuest'), 'ghost', !m.is_guest) +
       b('edit-user', L('edit'), 'ghost') + b('reset-pin', L('resetPin'), 'ghost') +
       '<button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button></div></div>';
@@ -1166,12 +1178,12 @@
     if (S.step === 'loading') { app.innerHTML = '<main class="authwrap"><p class="muted">…</p></main>'; nav.hidden = true; return; }
     if (S.step === 'login') { app.innerHTML = viewLogin(); nav.hidden = true; return; }
     // Reihenfolge wie in der FBRO-App: Profil steht ganz rechts
-    var tabs = [{ id: 'events', label: L('navEvents'), icon: ICON.cal }, { id: 'tasks', label: L('navTasks'), icon: ICON.tasks }, { id: 'shop', label: L('navShop'), icon: ICON.cart }];
+    var tabs = S.me.is_guest ? [] : [{ id: 'events', label: L('navEvents'), icon: ICON.cal }, { id: 'tasks', label: L('navTasks'), icon: ICON.tasks }, { id: 'shop', label: L('navShop'), icon: ICON.cart }];   // Gäste sehen nur Gastro und Profil
     // je aktivierter Gastronomie (Admin → Gastronomie) eine Hauptseite mit eigenem Katalog
     if (enabledGastros().length) tabs.push({ id: 'gastro', label: L('navGastro'), icon: ICON.food });   // eine Seite «Gastro» mit einer Sektion je aktivierter Gastronomie
-    if (canManageEvents()) tabs.push({ id: 'admin', label: L('navAdmin'), icon: ICON.gear });
+    if (!S.me.is_guest && (canManageEvents() || canManageGastro())) tabs.push({ id: 'admin', label: L('navAdmin'), icon: ICON.gear });
     tabs.push({ id: 'profile', label: L('navProfile'), icon: ICON.user });
-    if (!tabs.some(function (t) { return t.id === S.tab; })) S.tab = 'events';
+    if (!tabs.some(function (t) { return t.id === S.tab; })) S.tab = tabs[0].id;
     ['einkauf'].concat(S.gastros.map(function (g) { return g.key; })).forEach(function (k) {   // Standard: Sektionen und «Weitere Produkte» zugeklappt
       if (S.sec['need-others:' + k] === undefined) S.sec['need-others:' + k] = false;
       if (k !== 'einkauf' && S.sec['gs-' + k] === undefined) S.sec['gs-' + k] = false;
@@ -1664,7 +1676,7 @@
           if (r.error) throw r.error;
         });
       }
-      case 'gastro': if (isAdmin()) return rpc('set_gastro', { p_key: id, p_on: v === '1' }, L('saved')); return;
+      case 'gastro': if (canManageGastro()) return rpc('set_gastro', { p_key: id, p_on: v === '1' }, L('saved')); return;
       case 'gastro-add': {
         if (!isAdmin()) return;
         var gf = await askForm(L('gastroAdd'), [{ name: 'name', label: L('gastroName') }]);
@@ -1674,6 +1686,7 @@
       case 'applang': if (isAdmin() && v !== S.defaultLang) return rpc('set_app_language', { p_lang: v }, L('langSaved')); return;
       case 'design': if (isAdmin() && v !== adminDesign) return rpc('set_app_design', { p_design: v }, L('designSaved')); return;
       case 'em': return rpc('set_event_manager', { target: id, flag: v === 'true' }, L('saved'));
+      case 'gm': return rpc('set_gastro_manager', { target: id, flag: v === 'true' }, L('saved'));
       case 'guest': return rpc('set_guest', { target: id, flag: v === 'true' }, L('saved'));
       case 'mb-menu': if (isAdmin() && member) memberMenu(member); return;
       case 'logout': return logout();
@@ -1741,10 +1754,12 @@
         return rpc('admin_update_member', { target: id, new_name: r.name, new_phone: ph }, L('saved'));
       }
       case 'add-user': {
-        var f = await askForm(L('addUser'), [{ name: 'name', label: L('fullName') }, { name: 'phone', label: L('phone'), type: 'phone' }, { name: 'guest', label: L('guestCheck'), type: 'checkbox' }], null, L('addUserNote'));
+        var onlyGuest = !isAdmin();   // Gastro Manager eröffnen nur Gäste
+        if (onlyGuest && !canManageGastro()) return;
+        var f = await askForm(onlyGuest ? L('addGuest') : L('addUser'), [{ name: 'name', label: L('fullName') }, { name: 'phone', label: L('phone'), type: 'phone' }].concat(onlyGuest ? [] : [{ name: 'guest', label: L('guestCheck'), type: 'checkbox' }]), null, L('addUserNote'));
         if (!f) return;
         var p2 = normPhone(f.phone); if (!f.name || !p2) return toast(L('phoneInvalid'));
-        return rpc('admin_create_user', { p_name: f.name, p_phone: p2, p_guest: !!f.guest }, L('userAdded'));
+        return rpc('admin_create_user', { p_name: f.name, p_phone: p2, p_guest: onlyGuest || !!f.guest }, L('userAdded'));
       }
     }
   });
