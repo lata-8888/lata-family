@@ -234,11 +234,8 @@ p{margin:0}
 .tab span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Einkauf: Umschalter, private Listen */
-.acc.privlist{border-style:dashed;border-color:var(--crown)}
-.acc.privlist .acch{background:color-mix(in srgb,var(--crown) 18%,var(--surface))}
 .lock{display:inline-flex;width:18px;height:18px;vertical-align:-3px;margin-right:6px}
 .lock svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.privtag{font-family:var(--font);font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--crown);color:#fff;margin-left:8px;vertical-align:2px}
 /* Events: Weitere Events einklappen (wie «Weitere Termine» in der FBRO-App) */
 .morebtn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 6px;padding:14px 16px;border-radius:var(--r-card);border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:600;font-size:1rem}
 .morebtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}

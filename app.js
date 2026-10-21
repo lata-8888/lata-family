@@ -272,7 +272,7 @@
     return new Promise(function (resolve) {
       var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
       wrap.innerHTML = '<div class="ccsheet" role="alertdialog" aria-modal="true"><h3>' + esc(title) + '</h3><p>' + esc(message) + '</p>' +
-        '<div class="row"><button class="btn ghost" data-v="0">' + esc(L('cancel')) + '</button><button class="btn' + (danger ? ' danger' : '') + '" data-v="1">' + esc(L('confirm')) + '</button></div></div>';
+        '<div class="row"><button class="btn ghost" data-v="0">' + esc(L('cancel')) + '</button><button class="btn' + (danger ? ' danger' : '') + '" data-v="1">' + esc(title) + '</button></div></div>';
       document.body.appendChild(wrap);
       wrap.addEventListener('click', function (e) {
         if (e.target === wrap) { wrap.remove(); resolve(false); }
@@ -751,10 +751,10 @@
       { name: 'title', label: L('taskTitle'), value: t && t.title, inline: true },
       { name: 'due_date', label: L('taskDue'), type: 'date', value: t ? t.due_date : '', inline: true },
       { name: 'note', label: L('taskNote'), value: t && t.note, inline: true },
-      (!t || t.created_by === S.me.id) ? privField(t) : null,
-      favPeopleField(have, true)
+      favPeopleField(have, true),
+      (!t || t.created_by === S.me.id) ? privField(t) : null
     ].filter(Boolean) : [favPeopleField(have, false)];
-    var f = await askForm(t ? L('taskEdit') : L('taskNew'), fields, null, null, t && manage ? L('del') : null);   // «Löschen» unten im Dialog
+    var f = await askForm(t ? L('taskEdit') : L('taskNew'), fields, null, t && !manage ? t.title : null, t && manage ? L('del') : null);   // «Löschen» unten im Dialog
     if (!f) return;
     if (f.__extra) {
       if (await askConfirm(L('del'), L('taskDeleteAsk', { title: t.title }), true))
@@ -793,7 +793,7 @@
   }
   // neue Liste anlegen (Dialog); liefert die ID oder null
   async function newListDialog() {
-    var lf = await askForm(L('shNewList'), [
+    var lf = await askForm(L('shListAdd'), [
       { name: 'name', label: L('shListName') },
       { name: 'is_private', label: L('privLabel'), type: 'checkbox', value: false }
     ]);
@@ -834,7 +834,7 @@
     if ((mode === 'more' && it.ws.length) || ((mode === 'list' || mode === 'none') && (it.ws.length > 1 || !it.w))) {
       parts.push(esc(L('shFor', { names: it.ws.map(function (x) { return x.user_id === S.me.id ? L('you') : nameOf(x.user_id); }).join(', ') })));
     }
-    if (mode === 'fav') { var l = listById(it.w.list_id); parts.push(l ? lockIcon(l) + esc(l.name) : esc(L('shNoList'))); }
+    if (mode === 'fav') { var l = listById(it.w.list_id); parts.push(l ? esc(l.name) : esc(L('shNoList'))); }
     return parts.join(' · ');
   }
   // Zeile eines Produkts; mode: fav (meine Favoriten) | more (weitere Produkte) | list (in einer Einkaufsliste) | none (Favorit ohne Liste)
@@ -858,7 +858,7 @@
   function viewShop() {
     var needView = S.shopView !== 'lists';
     var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1></div>' +
-      (needView ? '' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shNewList')) + '" title="' + esc(L('shNewList')) + '">' + ICON.plus + '</button>') + '</div>';
+      (needView ? '<button type="button" class="hico addbtn" data-act="need-new" aria-label="' + esc(L('shAdd')) + '" title="' + esc(L('shAdd')) + '">' + ICON.plus + '</button>' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shListAdd')) + '" title="' + esc(L('shListAdd')) + '">' + ICON.plus + '</button>') + '</div>';
     // zwei Register (Tabs) statt Knöpfe
     var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
     html += '<div class="subtabs" role="tablist">' + tab('need', L('shNeed')) + tab('lists', L('shLists')) + '</div>';
@@ -873,7 +873,7 @@
     var mine = {}; favs.forEach(function (it) { mine[it.p.id] = true; });
     var more = S.products.filter(function (p) { return !mine[p.id]; }).map(function (p) { return { p: p, w: null, ws: S.wishes.filter(function (w) { return w.product_id === p.id; }), listId: '' }; }).sort(byItem);
     return accordion('need-open', L('shFavs'), favs.length, ulOf(favs.map(function (it) { return needRow(it, 'fav'); }), 'shEmpty')) +
-      accordion('need-others', L('shMore'), more.length, ulOf(more.map(function (it) { return needRow(it, 'more'); }), 'shMoreEmpty'), 'need-new', L('shAdd'));
+      accordion('need-others', L('shMore'), more.length, ulOf(more.map(function (it) { return needRow(it, 'more'); }), 'shMoreEmpty'));
   }  function viewLists() {
     var sel = S.wishes.filter(function (w) { return w.selected; });   // nur auf der Wunschliste gewählte Produkte
     var none = groupItems(sel.filter(function (w) { return !w.list_id && w.user_id === S.me.id; }));   // ohne Liste: nur meine
@@ -883,11 +883,11 @@
       var items = groupItems(sel.filter(function (w) { return w.list_id === l.id; }), l.id);   // jedes Produkt einmal, mit den Namen der Wünschenden
       var isDone = function (it) { return it.ws.every(function (x) { return x.checked; }); };
       var itemsOpen = items.filter(function (it) { return !isDone(it); }), itemsDone = items.filter(isDone);
-      var dots = l.owner_id === S.me.id ? '<button type="button" class="hico" data-act="list-menu" data-id="' + l.id + '" aria-label="' + esc(L('shManage')) + '" title="' + esc(L('shManage')) + '">' + ICON.dots + '</button>' : '';
+      var dots = l.owner_id === S.me.id ? '<button type="button" class="hico" data-act="list-edit" data-id="' + l.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' : '';
       var open = S.sec['lst-' + l.id] !== false;
-      html += '<section class="acc' + (l.is_private ? ' privlist' : '') + '"><div class="acch">' +
+      html += '<section class="acc"><div class="acch">' +
         '<button type="button" class="acct" data-act="sec" data-id="lst-' + l.id + '" aria-expanded="' + open + '">' + lockIcon(l) + esc(l.name) + ' <span class="cnt">(' + itemsOpen.length + ')</span>' +
-        (l.is_private ? '<span class="privtag">' + esc(L('shPrivTag')) + '</span>' : '') + '</button>' +
+        '</button>' +
         dots + '<button type="button" class="hico" data-act="list-update" data-id="' + l.id + '" aria-label="' + esc(L('shUpdate')) + '" title="' + esc(L('shUpdate')) + '">' + ICON.refresh + '</button>' +
         '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
         (open ? '<div class="accbody">' + (itemsOpen.length || !itemsDone.length ? ulOf(itemsOpen.map(function (it) { return needRow(it, 'list'); }), 'shEmpty') : '') +
@@ -925,10 +925,10 @@
     // Notiz und Liste gehören zum Favoriten; ist das Produkt noch kein Favorit, gelten sie für die neu gewählten Personen
     fields.push({ name: 'note', label: L('shNote'), value: w ? w.note : '', inline: true });
     fields.push(listField(w && w.list_id));
+    fields.push(favForField(p, w ? [S.me.id] : []));
     // «Privat»: nur die Person, die das Produkt angelegt hat – und nur solange niemand sonst es als Favorit führt
     if (p.created_by === S.me.id && (p.is_private || !wishersOf(p.id).some(function (x) { return x.user_id !== S.me.id; }))) fields.push(privField(p));
-    fields.push(favForField(p, w ? [S.me.id] : []));
-    var fr = await askForm(L('shEditNeed'), fields, null, null, canRename(p) ? L('shProdDel') : null);   // «Produkt löschen» unten im Dialog
+    var fr = await askForm(L('shEditNeed'), fields, null, canRename(p) ? null : p.name, canRename(p) ? L('shProdDel') : null);   // «Produkt löschen» unten im Dialog
     if (!fr || fr.__extra) return fr;
     return (await resolveListChoice(fr)) ? fr : null;
   }
@@ -968,7 +968,7 @@
     var f = await askForm(r ? L('recurEdit') : L('recurNew'), [
       { name: 'title', label: L('taskTitle'), value: r && r.title },
       { name: 'assigned_to', label: L('taskAssignee'), type: 'select', value: r ? r.assigned_to : S.me.id, options: S.members.map(function (m) { return { v: m.id, l: m.name + (m.id === S.me.id ? ' (' + L('you') + ')' : '') }; }) },
-      { name: 'freq', label: L('recFreq'), type: 'select', value: r ? r.freq : 'weekly', options: [{ v: 'daily', l: L('recDaily') }, { v: 'weekly', l: L('recWeekly') }, { v: 'monthly', l: L('recMonthly') }] },
+      { name: 'freq', label: L('recFreq'), type: 'cat', value: r ? r.freq : 'weekly', options: [{ v: 'daily', c: PCOLORS[0], l: L('recDaily') }, { v: 'weekly', c: PCOLORS[1], l: L('recWeekly') }, { v: 'monthly', c: PCOLORS[2], l: L('recMonthly') }] },
       { name: 'weekday', label: L('recWeekday'), type: 'select', value: String((r && r.weekday) || 1), options: days },
       { name: 'month_day', label: L('recMonthDay'), type: 'number', value: String((r && r.month_day) || 1) },
       { name: 'start_date', label: L('recStart'), type: 'date', value: r ? r.start_date : today() },
@@ -1019,7 +1019,7 @@
       var self = m.id === S.me.id, lamp = m.pin_changed ? L('pinLampOk') : L('pinLampNo');
       return '<li class="mbrow"><div class="l"><b>' + esc(m.name) + ' <span class="pinlamp ' + (m.pin_changed ? 'ok' : 'no') + '" title="' + esc(lamp) + '" aria-label="' + esc(lamp) + '"></span>' +
         (self ? ' <span class="mbyou">' + esc(L('you')) + '</span>' : '') + '</b><span>' + esc(fmtPhone(m.phone)) + '</span></div>' +
-        '<span class="mbicons">' + (m.is_admin ? tag('adm', L('roleAdmin'), ICON.gear) : '') + (m.is_event_manager ? tag('em', L('roleEM'), ICON.star) : '') + '</span>' +
+        '<span class="mbicons">' + (m.is_admin ? tag('adm', L('roleAdmin'), ICON.gear) : '') + (m.is_event_manager ? tag('em', L('roleEM'), ICON.cal) : '') + '</span>' +
         '<button type="button" class="hico" data-act="mb-menu" data-id="' + esc(m.id) + '" aria-label="' + esc(L('actions') + ': ' + m.name) + '" title="' + esc(L('actions')) + '">' + ICON.dots + '</button></li>';
     };
     // Zwei Gruppen: User und Gäste (klappbar wie die Gruppen in der FBRO-App)
@@ -1077,23 +1077,11 @@
       b('em', m.is_event_manager ? L('revokeEM') : L('makeEM'), 'ghost', !m.is_event_manager) +
       b('guest', m.is_guest ? L('makeUser') : L('makeGuest'), 'ghost', !m.is_guest) +
       b('edit-user', L('edit'), 'ghost') + b('reset-pin', L('resetPin'), 'ghost') +
-      (!self ? b('remove', L('remove'), 'danger') : '') +
       '<button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button></div></div>';
     document.body.appendChild(wrap);
     wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('button')) wrap.remove(); });
   }
 
-  // «…»-Menü einer Liste: Umbenennen, privat/gemeinsam, Löschen (data-act wird vom globalen Klick-Handler ausgeführt)
-  function listMenu(l) {
-    var wrap = document.createElement('div'); wrap.className = 'ccsheet-bg';
-    var b = function (act, label, cls) { return '<button type="button" class="btn ' + cls + '" data-act="' + act + '" data-id="' + esc(l.id) + '">' + esc(label) + '</button>'; };
-    var own = l.owner_id === S.me.id;
-    wrap.innerHTML = '<div class="ccsheet" role="dialog" aria-modal="true" aria-label="' + esc(l.name) + '"><h3>' + esc(l.name) + '</h3><div class="menu">' +
-      (own ? b('list-rename', L('shRename'), 'ghost') + b('list-priv', l.is_private ? L('shMakeShared') : L('shMakePrivate'), 'ghost') + b('list-del', L('del'), 'danger') : '') +
-      '<button type="button" class="btn ghost" data-x="cancel">' + esc(L('cancel')) + '</button></div></div>';
-    document.body.appendChild(wrap);
-    wrap.addEventListener('click', function (e) { if (e.target === wrap || e.target.closest('button')) wrap.remove(); });
-  }
   function render() {
     var app = document.getElementById('app'), nav = document.getElementById('nav');
     if (!configured) { app.innerHTML = '<main class="authwrap"><div class="authcard"><h1>' + esc(L('setupTitle')) + '</h1><p>' + esc(L('notConfigured')) + '</p></div></main>'; nav.hidden = true; return; }
@@ -1240,8 +1228,8 @@
     var inSeries = ev.series_id && S.events.filter(function (x) { return x.series_id === ev.series_id; }).length > 1;
     var scope = 'one';
     if (inSeries) {
-      var sf = await askForm(L('del'), [{ name: 'scope', label: L('evDelScope'), type: 'select', value: 'future', options: [
-        { v: 'future', l: L('evDelFuture') }, { v: 'one', l: L('evDelOne') }, { v: 'all', l: L('evDelAll') }] }], L('del'), L('evDeleteAsk', { name: ev.title }));
+      var sf = await askForm(L('del'), [{ name: 'scope', label: L('evDelScope'), type: 'cat', value: 'future', options: [
+        { v: 'future', c: PCOLORS[0], l: L('evDelFuture') }, { v: 'one', c: PCOLORS[1], l: L('evDelOne') }, { v: 'all', c: PCOLORS[2], l: L('evDelAll') }] }], L('del'), L('evDeleteAsk', { name: ev.title }));
       if (!sf) return;
       scope = sf.scope;
     } else if (!(await askConfirm(L('del'), L('evDeleteAsk', { name: ev.title }), true))) return;
@@ -1254,7 +1242,7 @@
   }
   // Personen ohne Verwalterrechte (kein Admin/Event Manager) sehen nur «Favorit für»: Personen hinzufügen, sich selbst abwählen (bei Serien ab diesem Termin)
   async function eventFavForm(ev, have) {
-    var f = await askForm(L('evEdit'), [favPeopleField(have, false)]);
+    var f = await askForm(L('evEdit'), [favPeopleField(have, false)], null, ev.title);
     if (!f) return;
     var sel = f.users || [], add = sel.filter(function (u) { return have.indexOf(u) < 0; });
     var dropMe = have.indexOf(S.me.id) > -1 && sel.indexOf(S.me.id) < 0;
@@ -1434,7 +1422,18 @@
       case 'sec': S.sec[id] = !(S.sec[id] !== false); return render();
       case 'who': S.open['ev:' + id] = !S.open['ev:' + id]; return render();
       case 'shop-view': S.shopView = v; return render();
-      case 'list-menu': { var lm = listById(id); if (lm) listMenu(lm); return; }
+      case 'list-edit': {
+        var el = listById(id); if (!el || el.owner_id !== S.me.id) return;
+        var ef = await askForm(L('shListEdit'), [{ name: 'name', label: L('shListName'), value: el.name }, { name: 'is_private', label: L('privLabel'), type: 'checkbox', value: !!el.is_private }], null, null, L('del'));
+        if (!ef) return;
+        if (ef.__extra) {
+          if (await askConfirm(L('del'), L('shDeleteListAsk', { name: el.name }), true))
+            return act(async function () { var r = await sb.from(T('shop_lists')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
+          return;
+        }
+        if (!ef.name) return;
+        return act(async function () { var r = await sb.from(T('shop_lists')).update({ name: ef.name, is_private: !!ef.is_private }).eq('id', id); if (r.error) throw r.error; }, L('saved'));
+      }
       case 'need-new': {
         // neues Produkt; die Vorschläge zeigen den ganzen Katalog, «in deinen Favoriten» = ich führe es bereits
         var known = S.products.slice().sort(byName).map(function (p) { return { n: p.name, on: !!myWish(p.id) }; });
@@ -1442,8 +1441,8 @@
           { name: 'name', label: L('shName'), suggest: known, suggestOn: L('shOnList'), inline: true },
           { name: 'note', label: L('shNote'), inline: true },
           listField(''),
-          privField(null),
-          favForField(null, [S.me.id])
+          favForField(null, [S.me.id]),
+          privField(null)
         ]);
         if (!nf || !(await resolveListChoice(nf))) return;
         return needAdd(nf.name, { note: nf.note, list_id: nf.list_id, users: nf.users, private: nf.private });
@@ -1524,22 +1523,6 @@
         }, L('saved'));
       }
       case 'list-new': { if (await newListDialog()) { await loadAll(); render(); toast(L('saved')); } return; }
-      case 'list-rename': {
-        var rl = listById(id); if (!rl) return;
-        var rn = await askForm(L('shRename'), [{ name: 'name', label: L('shListName'), value: rl.name }]);
-        if (!rn || !rn.name) return;
-        return act(async function () { var r = await sb.from(T('shop_lists')).update({ name: rn.name }).eq('id', id); if (r.error) throw r.error; }, L('saved'));
-      }
-      case 'list-priv': {
-        var pl = listById(id); if (!pl) return;
-        return act(async function () { var r = await sb.from(T('shop_lists')).update({ is_private: !pl.is_private }).eq('id', id); if (r.error) throw r.error; }, L('saved'));
-      }
-      case 'list-del': {
-        var dl = listById(id);
-        if (dl && await askConfirm(L('del'), L('shDeleteListAsk', { name: dl.name }), true))
-          return act(async function () { var r = await sb.from(T('shop_lists')).delete().eq('id', id); if (r.error) throw r.error; }, L('removed'));
-        return;
-      }
       case 'rec-new': return recurForm(null);
       case 'rec-edit': return recurForm(S.rules.filter(function (x) { return x.id === id; })[0]);
       case 'rec-toggle': {
@@ -1588,12 +1571,12 @@
         sb.from(T('profiles')).update({ design: v }).eq('id', S.me.id).then(function () {}, function (e2) { console.error(e2); });
         return;
       case 'edit-name': {
-        var nameF = await askForm(L('fullName'), [{ name: 'name', label: L('fullName'), value: S.me.name }]);
+        var nameF = await askForm(L('profNameTitle'), [{ name: 'name', label: L('fullName'), value: S.me.name }]);
         if (!nameF || !nameF.name || nameF.name === S.me.name) return;
         return act(async function () { var r = await sb.from(T('profiles')).update({ name: nameF.name }).eq('id', S.me.id); if (r.error) throw r.error; }, L('saved'));
       }
       case 'edit-phone': {
-        var phoneF = await askForm(L('phone'), [{ name: 'phone', label: L('phone'), type: 'phone', value: S.me.phone }], null, L('editPhonePin'));
+        var phoneF = await askForm(L('profPhoneTitle'), [{ name: 'phone', label: L('phone'), type: 'phone', value: S.me.phone }], null, L('editPhonePin'));
         if (!phoneF) return;
         var ph3 = normPhone(phoneF.phone); if (!ph3) return toast(L('phoneInvalid'));
         if (ph3 === S.me.phone) return;
@@ -1617,9 +1600,9 @@
       }
       case 'ev-more': S.open.evmore = !S.open.evmore; return render();
       case 'ev-horizon': {
-        var hopts = [1, 2, 3, 4, 6, 9, 12].map(function (n) { return { v: String(n), l: n === 1 ? L('evMonthOne') : L('evMonthsN', { n: n }) }; });
-        hopts.push({ v: '0', l: L('evAllMonths') });
-        var hf = await askForm(L('evHorizonTitle'), [{ name: 'months', label: L('evHorizonLbl'), type: 'select', value: String(evHorizon()), options: hopts }]);
+        var hopts = [1, 2, 3, 4, 6, 9, 12].map(function (n) { return { v: String(n), c: PCOLORS[0], l: n === 1 ? L('evMonthOne') : L('evMonthsN', { n: n }) }; });
+        hopts.push({ v: '0', c: PCOLORS[0], l: L('evAllMonths') });
+        var hf = await askForm(L('evHorizonTitle'), [{ name: 'months', label: L('evHorizonLbl'), type: 'cat', value: String(evHorizon()), options: hopts }]);
         if (!hf) return;
         try { localStorage.setItem('app-ev-horizon' + SFX, hf.months); } catch (e2) { /* ignorieren */ }
         return render();
@@ -1638,13 +1621,14 @@
         if (await askConfirm(L('remove'), L('removeAsk', { name: member.name }), true)) return rpc('remove_member', { target: id }, L('removed'));
         return;
       case 'edit-user': {
-        var r = await askForm(L('edit'), [{ name: 'name', label: L('fullName'), value: member.name }, { name: 'phone', label: L('phone'), value: member.phone, type: 'phone' }], null, L('editPhoneNote'));
+        var r = await askForm(L('userEdit'), [{ name: 'name', label: L('fullName'), value: member.name }, { name: 'phone', label: L('phone'), value: member.phone, type: 'phone' }], null, L('editPhoneNote'), id !== S.me.id ? L('remove') : null);
         if (!r) return;
+        if (r.__extra) { if (await askConfirm(L('remove'), L('removeAsk', { name: member.name }), true)) return rpc('remove_member', { target: id }, L('removed')); return; }
         var ph = normPhone(r.phone); if (!ph) return toast(L('phoneInvalid'));
         return rpc('admin_update_member', { target: id, new_name: r.name, new_phone: ph }, L('saved'));
       }
       case 'add-user': {
-        var f = await askForm(L('addUser'), [{ name: 'name', label: L('fullName') }, { name: 'phone', label: L('phone'), type: 'phone' }, { name: 'guest', label: L('guestCheck'), type: 'checkbox' }], L('addUser'), L('addUserNote'));
+        var f = await askForm(L('addUser'), [{ name: 'name', label: L('fullName') }, { name: 'phone', label: L('phone'), type: 'phone' }, { name: 'guest', label: L('guestCheck'), type: 'checkbox' }], null, L('addUserNote'));
         if (!f) return;
         var p2 = normPhone(f.phone); if (!f.name || !p2) return toast(L('phoneInvalid'));
         return rpc('admin_create_user', { p_name: f.name, p_phone: p2, p_guest: !!f.guest }, L('userAdded'));

@@ -1,6 +1,21 @@
 # Konsistenz-Prüfung Fenster und Dialoge
 
-**Umgesetzt in v75:** A1 (Labels links), A2 (alle Dialoge kompakt), A4 (Wortlaut «Privat (nur für mich sichtbar)»), A6 (Lösch-Knopf heisst überall «Entfernen»), B1 (Aufgabe → Task), C2 (Admin-Listen: Stift und Stern, ohne Text). Alle übrigen Punkte sind noch offen.
+**Umgesetzt in v75:** A1 (Labels links), A2 (alle Dialoge kompakt), A4 (Wortlaut «Privat (nur für mich sichtbar)»), A6 (Lösch-Knopf heisst überall «Entfernen»), B1 (Aufgabe → Task), C2 (Admin-Listen: Stift und Stern, ohne Text).
+
+**Umgesetzt in v77 (übrige Punkte):**
+* **A3** «Favorit für» steht bei Event, Task und Produkt vor «Privat».
+* **A5 / A10 / C7** «Entfernen» steht bei Person und Einkaufsliste jetzt unten im Bearbeiten-Dialog (Person bearbeiten; neu: Einkaufsliste bearbeiten mit Name, Privat, Entfernen; Stift statt «…»). Das Personen-Menü enthält nur noch Rolle ändern, Bearbeiten, PIN zurücksetzen. Die eigene Person lässt sich nicht entfernen.
+* **A7 / D** Formulare heissen «Speichern» (auch «Person hinzufügen»); Rückfragen tragen die Aktion als Knopf («Entfernen», «PIN zurücksetzen»).
+* **A8 / A11** Serien-Umfang, Zeithorizont und Wiederholung sind farbige Kacheln. «Zuweisen an» und «Wochentag» (viele Werte) bleiben Auswahllisten.
+* **A9** Titel: «Einkaufsliste hinzufügen/bearbeiten», «Person bearbeiten», «Name ändern», «Handynummer ändern».
+* **B2** Task-Datum heisst überall «Termin» (Liste: «Termin: …»).
+* **B5** «Leer» ersetzt «(noch in keiner Liste)».
+* **C1 / C8** «+» steht auf Agenda, Tasks und Einkauf oben rechts (Wunschliste: neues Produkt, Einkaufslisten: neue Liste). Im Admin bleibt «+» im jeweiligen Abschnitt.
+* **C3** Event Manager hat das Kalender-Symbol statt des Sterns.
+* **C4 / C5** Privat = Schloss vor dem Titel; Schild «Privat» und gestrichelter Rand der Einkaufsliste entfallen; kein Schloss mehr in der Unterzeile.
+* **D** Eingeschränkte Dialoge (nur «Favorit für») nennen das Objekt unter dem Titel.
+
+**Bewusst nicht geändert:** B3 (Event «Von/Bis» vs. Task «Termin»), B4 (Notiz bei Events bleibt weggelassen), B6 («Wunschliste» und «Favoriten» bleiben, so entschieden), C6 (Pfeile sind einheitlich; Admin-Abschnitte starten zu, Einkauf-Abschnitte offen).
 
 Stand: App v74, geprüft anhand von Bildschirmfotos aller Dialoge und Hauptansichten sowie des Quelltexts.
 Dies ist eine **Bestandsaufnahme ohne Änderungen**. Jeder Punkt nennt, was heute unterschiedlich ist, und einen Vorschlag für den einheitlichen Zustand.
