@@ -129,9 +129,9 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], shopView: 'need', tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], modules: {}, shopView: 'need', tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
-  var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'g-user', 'g-guest'];
+  var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'gastro', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
   S.assign = [];   // Zuteilung von Events an Personen: { event_id, user_id }
   S.taskAssign = [];   // Favoriten von Tasks: { task_id, user_id }
@@ -314,6 +314,7 @@
     filter: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>',
     pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg>',
     play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>',
+    food: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M17 3c-2 2-3 5-3 8h3v10M17 3v8"/></svg>',
     dots: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
     chev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'
   };
@@ -344,6 +345,9 @@
     S.assign = ra.data || [];
     S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.products = r[7].data; S.rules = r[8].data; S.wishes = r[9].data || [];
     adminDesign = DESIGNS.some(function (x) { return x.id === r[3].data; }) ? r[3].data : 'standard';
+    var rm = await sb.rpc(F('modules'));
+    if (rm.error) console.error(rm.error);   // ältere Datenbank ohne Module: keine Zusatzseiten
+    S.modules = rm.error || !rm.data ? {} : rm.data;
     S.defaultLang = LANGS.indexOf(r[4].data) > -1 ? r[4].data : 'de';
     try { localStorage.setItem('app-default-lang' + SFX, S.defaultLang); } catch (e) { /* ignorieren */ }
     S.me = S.members.filter(function (m) { return m.id === uid; })[0] || null;
@@ -937,6 +941,12 @@
     return (await resolveListChoice(fr)) ? fr : null;
   }
 
+  // Hauptseite «Il Mio Quattro» (Gastronomie) – nur sichtbar, wenn der Admin das Modul aktiviert hat
+  function viewIlMio() {
+    return '<div class="top"><div><h1 class="pagetitle">' + esc(L('navIlMio')) + '</h1></div></div>' +
+      '<section class="card"><p class="muted">' + esc(L('ilmSoon')) + '</p></section>';
+  }
+
   function viewProfile() {
     var opt = function (v, l) { return '<button type="button" class="segbtn' + (theme === v ? ' on' : '') + '" data-act="set-theme" data-val="' + v + '" aria-pressed="' + (theme === v) + '">' + esc(l) + '</button>'; };
     var standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
@@ -1049,6 +1059,12 @@
         '<span class="nm"><b>' + esc(L('design_' + d.id)) + '</b><span>' + esc(L('design_' + d.id + '_d')) + '</span></span>' +
         (on ? '<span class="ok">' + ICON.check + '</span>' : '') + '</button>';
     }).join('');
+    // Hauptgruppe «Gastronomie»: je Eintrag ein Schalter, der die zugehörige Hauptseite ein-/ausblendet
+    var sw = function (key, label) {
+      var on = !!S.modules[key];
+      return '<li class="modrow"><div class="l"><b>' + esc(label) + '</b></div><button type="button" role="switch" class="switch' + (on ? ' on' : '') + '" data-act="module" data-id="' + key + '" data-val="' + (on ? '0' : '1') + '" aria-checked="' + on + '" aria-label="' + esc(label) + '"><i></i></button></li>';
+    };
+    html += accordion('gastro', L('adminGastro'), null, '<ul class="list">' + sw('il_mio_quattro', L('navIlMio')) + '</ul>');
     html += accordion('design', L('designDefault'), null, dsg);
     // Standardsprache der App (nur Admins); Personen können sie im Profil überschreiben
     var lng = '<p class="muted small" style="margin-bottom:10px">' + esc(L('langHint')) + '</p>' + LANGS.map(function (l) {
@@ -1093,12 +1109,13 @@
     if (S.step === 'login') { app.innerHTML = viewLogin(); nav.hidden = true; return; }
     // Reihenfolge wie in der FBRO-App: Profil steht ganz rechts
     var tabs = [{ id: 'events', label: L('navEvents'), icon: ICON.cal }, { id: 'tasks', label: L('navTasks'), icon: ICON.tasks }, { id: 'shop', label: L('navShop'), icon: ICON.cart }];
+    if (S.modules.il_mio_quattro) tabs.push({ id: 'ilmio', label: L('navIlMio'), icon: ICON.food });   // Hauptseite nur, wenn im Admin (Gastronomie) aktiviert
     if (canManageEvents()) tabs.push({ id: 'admin', label: L('navAdmin'), icon: ICON.gear });
     tabs.push({ id: 'profile', label: L('navProfile'), icon: ICON.user });
     if (!tabs.some(function (t) { return t.id === S.tab; })) S.tab = 'events';
     var open = Array.prototype.map.call(document.querySelectorAll('details.ccel[open]'), function (d) { return d.dataset.k; });
     var banner = S.me.pin_changed ? '' : '<div class="pinbanner" role="status">' + esc(L('pinBanner')) + ' <button class="chip" data-act="goto" data-val="profile">' + esc(L('changePin')) + '</button></div>';
-    var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : S.tab === 'tasks' ? viewTasks() : S.tab === 'shop' ? viewShop() : viewEvents();
+    var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : S.tab === 'ilmio' ? viewIlMio() : S.tab === 'tasks' ? viewTasks() : S.tab === 'shop' ? viewShop() : viewEvents();
     app.innerHTML = banner + '<div class="shell">' + body + '</div>';
     nav.hidden = false;
     var bd = badges();
@@ -1563,6 +1580,7 @@
           if (r.error) throw r.error;
         });
       }
+      case 'module': if (isAdmin()) { if (!!S.modules[id] === (v === '1')) return; return rpc('set_module', { p_key: id, p_on: v === '1' }, L('saved')); } return;
       case 'applang': if (isAdmin() && v !== S.defaultLang) return rpc('set_app_language', { p_lang: v }, L('langSaved')); return;
       case 'design': if (isAdmin() && v !== adminDesign) return rpc('set_app_design', { p_design: v }, L('designSaved')); return;
       case 'em': return rpc('set_event_manager', { target: id, flag: v === 'true' }, L('saved'));
