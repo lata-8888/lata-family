@@ -212,6 +212,7 @@ p{margin:0}
 .trow.tdone .l b{text-decoration:line-through;opacity:.6}
 .trow.tdone .l span{opacity:.7}
 .tover{color:var(--no);font-weight:600}
+.cceh b.tover,:root[data-design] .cceh b.tover{color:var(--no)}
 .trow .btnrow{flex-direction:column}
 
 .ccel.tdone{opacity:.75}

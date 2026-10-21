@@ -720,11 +720,11 @@
       var m = S.members.filter(function (x) { return x.id === u; })[0] || {}, me = u === S.me.id;
       return '<span class="ccp' + (m.is_guest ? ' g' : '') + (me ? ' me' : '') + '">' + esc(m.name || '?') + (me ? ' ' + esc(L('you')) : '') + '</span>';
     }).join('');
-    var body = open ? '<div class="ccbody"><div class="evline">' + (pills ? '<span class="chips">' + pills + '</span>' : '<span class="small muted">' + esc(L('evNobody')) + '</span>') +
-      (over ? '<span class="tover small">' + esc(L('taskOverdue')) + '</span>' : '') + '</div>' +
+    var body = open ? '<div class="ccbody"><div class="evline">' + (t.due_date ? '<span class="small ' + (over ? 'tover' : 'muted') + '">' + esc(fmtDue(t.due_date)) + '</span>' : '') +
+      (pills ? '<span class="chips">' + pills + '</span>' : '<span class="small muted">' + esc(L('evNobody')) + '</span>') + '</div>' +
       (t.note ? '<p class="evcomment">' + esc(t.note) + '</p>' : '') + '</div>' : '';
     return '<article class="ccel' + (tdone ? ' tdone' : '') + '"><div class="cceh">' + chk +
-      '<b>' + (t.due_date ? '<span class="' + (over ? 'tover' : '') + '">' + esc(fmtDue(t.due_date)) + '</span> – ' : '') + lockIcon(t) + esc(t.title) + '</b>' +
+      '<b' + (over ? ' class="tover"' : '') + '>' + lockIcon(t) + esc(t.title) + '</b>' +
       '<button type="button" class="hico" data-act="task-edit" data-id="' + t.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
       '<button type="button" class="hico star' + (fav ? ' on' : '') + '" data-act="task-fav" data-id="' + t.id + '" aria-pressed="' + fav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button>' +
       '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="task-card" data-id="' + t.id + '" aria-expanded="' + open + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' + body + '</article>';
