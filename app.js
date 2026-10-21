@@ -789,7 +789,9 @@
   // lata-products: ein Eintrag je Produkt. lata-wishes: eine Person führt ein Produkt auf ihrer Wunschliste (Notiz, Liste, ausgewählt, abgehakt).
   // Eine Zeile in der Oberfläche heisst «Item»: { p: Produkt, w: mein Wunsch oder null, ws: Wünsche der Zeile, listId }
   // Einkauf und «Il Mio Quattro» sind zwei Seiten mit demselben Aufbau, aber eigenem Produktkatalog und eigenen Einkaufslisten (Spalte shop)
-  function shopKey() { return String(S.tab).indexOf('g:') === 0 ? S.tab.slice(2) : 'einkauf'; }   // Reiter «g:<key>» = Gastronomie, sonst Einkauf
+  // Reiter «Gastro» = eine Seite mit je einer Sektion pro Gastronomie; S.shopCtx = Sektion, in der gerade gezeichnet wird bzw. die zuletzt angetippt wurde (data-shop)
+  function enabledGastros() { return S.gastros.filter(function (g) { return g.enabled; }); }
+  function shopKey() { return S.tab === 'gastro' ? (S.shopCtx || (enabledGastros()[0] || {}).key || 'einkauf') : 'einkauf'; }
   function isGastro() { return shopKey() !== 'einkauf'; }
   function wQty(w) { return Math.max(1, w.qty || 1); }
   function fmtMoney(n) { return 'CHF ' + n.toLocaleString(LOCALE[lang], { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -800,7 +802,6 @@
     return { n: n, sum: sum };
   }
   function totalsLine(items) { var t = itemTotals(items); return items.length ? '<div class="shtotal">' + esc(L('shTotals', { n: t.n, sum: fmtMoney(t.sum) })) + '</div>' : ''; }
-  function shopTitle() { var k = shopKey(), g = S.gastros.filter(function (x) { return x.key === k; })[0]; return g ? g.name : L('navShop'); }
   function inShop(x) { return !!x && (x.shop || 'einkauf') === shopKey(); }
   function shopProds() { return S.products.filter(inShop); }
   function shopLists() { return S.lists.filter(inShop); }
@@ -885,14 +886,27 @@
       '<div class="btnrow">' + menu + star + '</div>' + (gfav ? counter : (check || '<span class="tspace" aria-hidden="true"></span>')) + '</li>';
   }
   function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
+  // Register «Wunschliste | Einkaufslisten» mit Inhalt (Einkauf und jede Gastronomie-Sektion)
+  function shopBody() {
+    var needView = curShopView() !== 'lists';
+    var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
+    return '<div class="subtabs" role="tablist">' + tab('need', L('shNeed')) + tab('lists', L('shLists')) + '</div>' + (needView ? viewNeeds() : viewLists());
+  }
   function viewShop() {
     var needView = curShopView() !== 'lists';
-    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(shopTitle()) + '</h1></div>' +
-      (needView ? '<button type="button" class="hico addbtn" data-act="need-new" aria-label="' + esc(L('shAdd')) + '" title="' + esc(L('shAdd')) + '">' + ICON.plus + '</button>' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shListAdd')) + '" title="' + esc(L('shListAdd')) + '">' + ICON.plus + '</button>') + '</div>';
-    // zwei Register (Tabs) statt Knöpfe
-    var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
-    html += '<div class="subtabs" role="tablist">' + tab('need', L('shNeed')) + tab('lists', L('shLists')) + '</div>';
-    return html + (needView ? viewNeeds() : viewLists());
+    return '<div class="top"><div><h1 class="pagetitle">' + esc(L('navShop')) + '</h1></div>' +
+      (needView ? '<button type="button" class="hico addbtn" data-act="need-new" aria-label="' + esc(L('shAdd')) + '" title="' + esc(L('shAdd')) + '">' + ICON.plus + '</button>' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shListAdd')) + '" title="' + esc(L('shListAdd')) + '">' + ICON.plus + '</button>') + '</div>' + shopBody();
+  }
+  // Seite «Gastro»: je aktivierter Gastronomie eine zuklappbare Sektion (Klon des Einkaufs mit eigenem Katalog); «+» legt in dieser Sektion ein Produkt bzw. eine Liste an
+  function viewGastro() {
+    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L('navGastro')) + '</h1></div></div>', saved = S.shopCtx;
+    enabledGastros().forEach(function (g) {
+      S.shopCtx = g.key;
+      var lists = curShopView() === 'lists';
+      html += '<div data-shop="' + esc(g.key) + '">' + accordion('gs-' + g.key, g.name, null, shopBody(), lists ? 'list-new' : 'need-new', L(lists ? 'shListAdd' : 'shAdd')) + '</div>';
+    });
+    S.shopCtx = saved;
+    return html;
   }
   function viewNeeds() {
     var uid = S.me.id;
@@ -902,13 +916,13 @@
     // Weitere Produkte: alle übrigen Produkte (auch ohne Wünsche); «+» legt ein neues Produkt an
     var mine = {}; favs.forEach(function (it) { mine[it.p.id] = true; });
     var more = shopProds().filter(function (p) { return !mine[p.id]; }).map(function (p) { return { p: p, w: null, ws: S.wishes.filter(function (w) { return w.product_id === p.id; }), listId: '' }; }).sort(byItem);
-    return accordion('need-open', L('shFavs'), favs.length, ulOf(favs.map(function (it) { return needRow(it, 'fav'); }), 'shEmpty')) +
-      accordion('need-others', L('shMore'), more.length, ulOf(more.map(function (it) { return needRow(it, 'more'); }), 'shMoreEmpty'));
+    return accordion('need-open:' + shopKey(), L('shFavs'), favs.length, ulOf(favs.map(function (it) { return needRow(it, 'fav'); }), 'shEmpty')) +
+      accordion('need-others:' + shopKey(), L('shMore'), more.length, ulOf(more.map(function (it) { return needRow(it, 'more'); }), 'shMoreEmpty'));
   }  function viewLists() {
     var sel = S.wishes.filter(function (w) { return w.selected && inShop(productById(w.product_id)); });   // nur auf der Wunschliste gewählte Produkte
     var none = groupItems(sel.filter(function (w) { return !w.list_id && w.user_id === S.me.id; }));   // ohne Liste: nur meine
     var gastro = isGastro();
-    var html = accordion('lst-none', L('shNoList'), none.length, ulOf(none.map(function (it) { return needRow(it, 'none'); }), 'shEmpty') + (gastro ? totalsLine(none) : ''));
+    var html = accordion('lst-none:' + shopKey(), L('shNoList'), none.length, ulOf(none.map(function (it) { return needRow(it, 'none'); }), 'shEmpty') + (gastro ? totalsLine(none) : ''));
     if (!shopLists().length) html += '<div class="empty"><p>' + esc(L('shNoLists')) + '</p></div>';
     sortedLists().forEach(function (l) {
       var items = groupItems(sel.filter(function (w) { return w.list_id === l.id; }), l.id);   // jedes Produkt einmal, mit den Namen der Wünschenden
@@ -1132,13 +1146,17 @@
     // Reihenfolge wie in der FBRO-App: Profil steht ganz rechts
     var tabs = [{ id: 'events', label: L('navEvents'), icon: ICON.cal }, { id: 'tasks', label: L('navTasks'), icon: ICON.tasks }, { id: 'shop', label: L('navShop'), icon: ICON.cart }];
     // je aktivierter Gastronomie (Admin → Gastronomie) eine Hauptseite mit eigenem Katalog
-    S.gastros.forEach(function (g) { if (g.enabled) tabs.push({ id: 'g:' + g.key, label: L('navGastro'), full: g.name, icon: ICON.food }); });   // Fussleiste: «Gastro», der Name steht auf der Seite
+    if (enabledGastros().length) tabs.push({ id: 'gastro', label: L('navGastro'), icon: ICON.food });   // eine Seite «Gastro» mit einer Sektion je aktivierter Gastronomie
     if (canManageEvents()) tabs.push({ id: 'admin', label: L('navAdmin'), icon: ICON.gear });
     tabs.push({ id: 'profile', label: L('navProfile'), icon: ICON.user });
     if (!tabs.some(function (t) { return t.id === S.tab; })) S.tab = 'events';
+    ['einkauf'].concat(S.gastros.map(function (g) { return g.key; })).forEach(function (k) {   // Standard: Sektionen und «Weitere Produkte» zugeklappt
+      if (S.sec['need-others:' + k] === undefined) S.sec['need-others:' + k] = false;
+      if (k !== 'einkauf' && S.sec['gs-' + k] === undefined) S.sec['gs-' + k] = false;
+    });
     var open = Array.prototype.map.call(document.querySelectorAll('details.ccel[open]'), function (d) { return d.dataset.k; });
     var banner = S.me.pin_changed ? '' : '<div class="pinbanner" role="status">' + esc(L('pinBanner')) + ' <button class="chip" data-act="goto" data-val="profile">' + esc(L('changePin')) + '</button></div>';
-    var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : String(S.tab).indexOf('g:') === 0 ? viewShop() : S.tab === 'tasks' ? viewTasks() : S.tab === 'shop' ? viewShop() : viewEvents();
+    var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : S.tab === 'gastro' ? viewGastro() : S.tab === 'tasks' ? viewTasks() : S.tab === 'shop' ? viewShop() : viewEvents();
     app.innerHTML = banner + '<div class="shell">' + body + '</div>';
     nav.hidden = false;
     var bd = badges();
@@ -1147,7 +1165,7 @@
       if (t.id === 'events' && bd.events) { mark = '<i class="dot"></i>'; hint = L('badgeEvToday'); }
       if (t.id === 'tasks' && bd.tasks) { mark = '<b class="cnt">' + (bd.tasks > 9 ? '9+' : bd.tasks) + '</b>'; hint = L('badgeTasks', { n: bd.tasks }); }
       if (t.id === 'admin' && bd.admin) { mark = '<i class="dot"></i>'; hint = L('badgeAdmin'); }
-      return '<button class="tab' + (t.id === S.tab ? ' on' : '') + '" data-act="goto" data-val="' + t.id + '" aria-current="' + (t.id === S.tab) + '"' + (hint ? ' aria-label="' + esc(t.label + ': ' + hint) + '"' : t.full ? ' aria-label="' + esc(t.full) + '" title="' + esc(t.full) + '"' : '') + '><span class="tic">' + t.icon + mark + '</span><span>' + esc(t.label) + '</span></button>';
+      return '<button class="tab' + (t.id === S.tab ? ' on' : '') + '" data-act="goto" data-val="' + t.id + '" aria-current="' + (t.id === S.tab) + '"' + (hint ? ' aria-label="' + esc(t.label + ': ' + hint) + '"' : '') + '><span class="tic">' + t.icon + mark + '</span><span>' + esc(t.label) + '</span></button>';
     }).join('');
     setAppBadge(bd.total);
     open.forEach(function (k) { var d = document.querySelector('details.ccel[data-k="' + k + '"]'); if (d) d.open = true; });
@@ -1457,6 +1475,7 @@
 
   document.addEventListener('click', async function (e) {
     var el = e.target.closest('[data-act]'); if (!el) return;
+    var sh = el.closest('[data-shop]'); if (sh) { S.activeShop = sh.dataset.shop; S.shopCtx = S.activeShop; }   // Gastro: Sektion, in der geklickt wurde
     var a = el.dataset.act, id = el.dataset.id, v = el.dataset.val;
     var member = S.members.filter(function (m) { return m.id === id; })[0];
     var ev = S.events.filter(function (x) { return x.id === id; })[0];
