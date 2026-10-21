@@ -957,7 +957,7 @@
     if (canRename(p)) fields.push({ name: 'name', label: L('shName'), value: p.name, inline: true });
     // Notiz und Liste gehören zum Favoriten; ist das Produkt noch kein Favorit, gelten sie für die neu gewählten Personen
     fields.push({ name: 'note', label: L('shNote'), value: w ? w.note : '', inline: true });
-    fields.push(listField(w && w.list_id));
+    fields.push(listField(listById(p.list_id) ? p.list_id : ''));   // die Einkaufsliste gehört zum Produkt und gilt für alle
     fields.push(favForField(p, w ? [S.me.id] : []));
     // «Privat»: nur die Person, die das Produkt angelegt hat – und nur solange niemand sonst es als Favorit führt
     if (p.created_by === S.me.id && (p.is_private || !wishersOf(p.id).some(function (x) { return x.user_id !== S.me.id; }))) fields.push(privField(p));
@@ -1558,15 +1558,17 @@
           if (newName !== ne.name) { var rn = await sb.from(T('products')).update({ name: newName }).eq('id', id); if (rn.error) throw rn.error; }
           var isPriv = nfe.private !== undefined ? !!nfe.private : !!ne.is_private;
           if (isPriv !== !!ne.is_private) { var rp = await sb.from(T('products')).update({ is_private: isPriv }).eq('id', id); if (rp.error) throw rp.error; }
+          // Einkaufsliste ändern: gilt für das Produkt, unabhängig davon, wer es bestellt
+          if ((nfe.list_id || '') !== (listById(ne.list_id) ? ne.list_id : '')) { var rl = await sb.rpc(F('set_product_list'), { p_product: id, p_list: nfe.list_id || null }); if (rl.error) throw rl.error; }
           var had = {}; wishersOf(id).forEach(function (w) { had[w.user_id] = true; });
           var sel = isPriv ? [S.me.id] : (nfe.users || []), addU = sel.filter(function (u) { return !had[u]; });
-          // Notiz/Liste angegeben, aber niemand gewählt und noch kein eigener Favorit: der Favorit wird für mich angelegt
-          if (!had[S.me.id] && !addU.length && (nfe.note || nfe.list_id)) addU = [S.me.id];
+          // Notiz angegeben, aber niemand gewählt und noch kein eigener Favorit: der Favorit wird für mich angelegt
+          if (!had[S.me.id] && !addU.length && nfe.note) addU = [S.me.id];
           if (addU.length) { var ra = await sb.rpc(F('add_product_in'), { p_shop: shopKey(), p_name: newName, p_note: nfe.note || null, p_list: nfe.list_id || null, p_users: addU, p_private: isPriv }); if (ra.error) throw ra.error; }
           if (had[S.me.id] && sel.indexOf(S.me.id) < 0) {   // mich abgewählt: mein Favorit entfällt
             var rd = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (rd.error) throw rd.error;
           } else if (had[S.me.id]) {
-            var r = await sb.from(T('wishes')).update({ note: nfe.note || null, list_id: nfe.list_id || null }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error;
+            var r = await sb.from(T('wishes')).update({ note: nfe.note || null }).eq('product_id', id).eq('user_id', S.me.id); if (r.error) throw r.error;
           }
         }, L('saved'));
       }
