@@ -707,23 +707,27 @@
     return a.title.localeCompare(b.title, LOCALE[lang]);
   }
   // mode: 'open' (mir zugeteilt, aktiv, offen) | 'done' (mir zugeteilt, nicht aktiv oder erledigt) | 'others' | leer (Admin-Liste)
-  function taskRow(t, mode) {
+  // Task als Karte wie ein Termin: umrahmt, Kopfzeile mit Kästchen, Titel, Stift, Stern und Pfeil zum Auf-/Zuklappen (Termin, Zugeteilte, Notiz)
+  function taskCard(t, mode) {
     var fav = isFavTask(t.id), canEdit = canEditTask(t), canDone = fav || canEdit;   // erledigen: Zugeteilte, Ersteller/in, Admins
     var back = mode === 'done';   // Register «Erledigt»: Kästchen angehakt, ein Tipp aktiviert den Task wieder
-    var tdone = back || t.done;
+    var tdone = back || t.done, open = !!S.open['tc:' + t.id];
     var over = !tdone && t.due_date && t.due_date < today();
-    var who = taskWho(t.id).map(function (u) { return u === S.me.id ? L('you') : nameOf(u); });
     var favLbl = fav ? L('shFavRemove') : L('shFavAdd');
     var chk = back ? '<button type="button" role="checkbox" class="tchk on" data-act="task-activate" data-id="' + t.id + '" aria-checked="true" aria-label="' + esc(L('taskReactivate')) + '" title="' + esc(L('taskReactivate')) + '">' + ICON.check + '</button>'
-      : canDone ? '<button type="button" role="checkbox" class="tchk' + (t.done ? ' on' : '') + '" data-act="task-done" data-id="' + t.id + '" aria-checked="' + !!t.done + '" aria-label="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '" title="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '">' + ICON.check + '</button>' : '<span class="tspace" aria-hidden="true"></span>';
-    return '<li class="trow' + (tdone ? ' tdone' : '') + '">' + chk +
-      '<div class="l"><b>' + lockIcon(t) + esc(t.title) + '</b>' +
-      (who.length ? '<span>' + esc(L('shFor', { names: who.join(', ') })) + '</span>' : '') +
-      (t.due_date ? '<span class="' + (over ? 'tover' : '') + '">' + esc(L('taskDueOn', { date: fmtDue(t.due_date) })) + (over ? ' · ' + esc(L('taskOverdue')) : '') + '</span>' : '') +
-      (t.note ? '<span class="tnote">' + esc(t.note) + '</span>' : '') + '</div>' +
-      '<div class="btnrow">' +
+      : canDone ? '<button type="button" role="checkbox" class="tchk' + (t.done ? ' on' : '') + '" data-act="task-done" data-id="' + t.id + '" aria-checked="' + !!t.done + '" aria-label="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '" title="' + esc(t.done ? L('taskReopen') : L('taskDone')) + '">' + ICON.check + '</button>' : '';
+    var pills = taskWho(t.id).map(function (u) {
+      var m = S.members.filter(function (x) { return x.id === u; })[0] || {}, me = u === S.me.id;
+      return '<span class="ccp' + (m.is_guest ? ' g' : '') + (me ? ' me' : '') + '">' + esc(m.name || '?') + (me ? ' ' + esc(L('you')) : '') + '</span>';
+    }).join('');
+    var body = open ? '<div class="ccbody"><div class="evline">' + (pills ? '<span class="chips">' + pills + '</span>' : '<span class="small muted">' + esc(L('evNobody')) + '</span>') +
+      (over ? '<span class="tover small">' + esc(L('taskOverdue')) + '</span>' : '') + '</div>' +
+      (t.note ? '<p class="evcomment">' + esc(t.note) + '</p>' : '') + '</div>' : '';
+    return '<article class="ccel' + (tdone ? ' tdone' : '') + '"><div class="cceh">' + chk +
+      '<b>' + (t.due_date ? '<span class="' + (over ? 'tover' : '') + '">' + esc(fmtDue(t.due_date)) + '</span> – ' : '') + lockIcon(t) + esc(t.title) + '</b>' +
       '<button type="button" class="hico" data-act="task-edit" data-id="' + t.id + '" aria-label="' + esc(L('edit')) + '" title="' + esc(L('edit')) + '">' + ICON.edit + '</button>' +
-      '<button type="button" class="hico star' + (fav ? ' on' : '') + '" data-act="task-fav" data-id="' + t.id + '" aria-pressed="' + fav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button></div></li>';
+      '<button type="button" class="hico star' + (fav ? ' on' : '') + '" data-act="task-fav" data-id="' + t.id + '" aria-pressed="' + fav + '" aria-label="' + esc(favLbl) + '" title="' + esc(favLbl) + '">' + ICON.star + '</button>' +
+      '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="task-card" data-id="' + t.id + '" aria-expanded="' + open + '" aria-label="' + esc(L('evInfo')) + '" title="' + esc(L('evInfo')) + '">' + ICON.chev + '</button></div>' + body + '</article>';
   }
   // Register: «Offen» (mir zugeteilt, aktiv, unerledigt), «Erledigt» (mir zugeteilt, nicht aktiv oder erledigt), «Andere» (nicht mir zugeteilt)
   function taskGroups() {
@@ -742,7 +746,7 @@
       '<button type="button" class="hico addbtn" data-act="task-new" aria-label="' + esc(L('taskNew')) + '" title="' + esc(L('taskNew')) + '">' + ICON.plus + '</button></div>';
     var tab = function (v, label) { var on = v === view; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="task-view" data-val="' + v + '">' + esc(label) + ' (' + g[v].length + ')</button>'; };
     html += '<div class="subtabs" role="tablist">' + tab('open', L('taskTabOpen')) + tab('done', L('taskDone')) + tab('others', L('taskTabOthers')) + '</div>';
-    return html + (g[view].length ? '<ul class="list">' + g[view].map(function (t) { return taskRow(t, view); }).join('') + '</ul>' : '<p class="muted">' + esc(L('taskEmpty')) + '</p>');
+    return html + (g[view].length ? g[view].map(function (t) { return taskCard(t, view); }).join('') : '<p class="muted">' + esc(L('taskEmpty')) + '</p>');
   }
   async function taskForm(t) {
     // Ersteller/in und Admins ändern die Aufgabe; alle anderen sehen nur «Favorit für» (Personen hinzufügen, sich selbst abwählen)
@@ -1036,7 +1040,7 @@
     html += accordion('recur', L('recurTitle'), S.rules.length, recurBody(), 'rec-new', L('recurNew'));
     // Alle Tasks (Admin): bearbeiten, erledigen, löschen
     var allT = S.tasks.slice().sort(taskSort);
-    html += accordion('a-tasks', L('adminTasks'), allT.length, (allT.length ? '<ul class="list">' + allT.map(taskRow).join('') + '</ul>' : '<p class="muted">' + esc(L('taskEmpty')) + '</p>'), 'task-new', L('taskNew'));
+    html += accordion('a-tasks', L('adminTasks'), allT.length, (allT.length ? allT.map(function (t) { return taskCard(t); }).join('') : '<p class="muted">' + esc(L('taskEmpty')) + '</p>'), 'task-new', L('taskNew'));
     // Design der ganzen App (nur Admins)
     var dsg = DESIGNS.map(function (d) {
       var on = d.id === adminDesign;
@@ -1532,6 +1536,7 @@
       case 'task-new': return taskForm(null);
       case 'task-edit': return taskForm(S.tasks.filter(function (x) { return x.id === id; })[0]);
       case 'task-view': S.taskView = v; return render();
+      case 'task-card': S.open['tc:' + id] = !S.open['tc:' + id]; return render();
       case 'task-done': {
         // erledigen deaktiviert den Task für mich (Register «Erledigt»); wieder öffnen aktiviert ihn
         var tk = S.tasks.filter(function (x) { return x.id === id; })[0]; if (!tk) return;

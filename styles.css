@@ -214,6 +214,10 @@ p{margin:0}
 .tover{color:var(--no);font-weight:600}
 .trow .btnrow{flex-direction:column}
 
+.ccel.tdone{opacity:.75}
+.ccel.tdone .cceh b{text-decoration:line-through}
+.cceh .tchk{width:26px;height:26px;margin-right:2px}
+.cceh .tchk svg{width:17px;height:17px}
 .tchk{width:30px;height:30px;flex:0 0 auto;border-radius:8px;border:2px solid var(--muted);background:var(--surface);color:transparent;display:inline-flex;align-items:center;justify-content:center;padding:0;margin-top:2px}
 .tchk svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
 .tchk:hover{border-color:var(--yes)}
