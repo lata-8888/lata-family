@@ -981,11 +981,11 @@
     });
   }
   // Produkt bearbeiten: Name (wer es angelegt hat, und Admins), Notiz und Liste gehören zu meinem Favoriten
-  // «Favorit für»: andere Personen können hier dazukommen; wer das Produkt schon führt, kann nur selbst abwählen (Stern) – ausser mir
+  // «Favorit für»: andere Personen können hier dazukommen; wer das Produkt schon führt, kann nur selbst abwählen (Stern); Admins können auch fremde Favoriten abwählen
   function favForField(p, users) {
     var have = {}; if (p) wishersOf(p.id).forEach(function (w) { have[w.user_id] = true; });
     return { name: 'users', label: L('shFavFor'), type: 'multi', chips: true, value: users,
-      options: memberOptions().map(function (o) { return { v: o.v, l: o.l, lock: !!have[o.v] && o.v !== S.me.id }; }) };
+      options: memberOptions().map(function (o) { return { v: o.v, l: o.l, lock: !!have[o.v] && o.v !== S.me.id && !isAdmin() }; }) };
   }
   async function needEditForm(p) {
     var w = myWish(p.id), fields = [];
@@ -1632,6 +1632,10 @@
           // Notiz angegeben, aber niemand gewählt und noch kein eigener Favorit: der Favorit wird für mich angelegt
           if (!had[S.me.id] && !addU.length && nfe.note) addU = [S.me.id];
           if (addU.length) { var ra = await sb.rpc(F('add_product_in'), { p_shop: shopKey(), p_name: newName, p_note: nfe.note || null, p_list: nfe.list_id || null, p_users: addU, p_private: isPriv }); if (ra.error) throw ra.error; }
+          if (isAdmin() && !isPriv) {   // Admin: fremde Favoriten abgewählt → entfernen
+            var dropU = Object.keys(had).filter(function (u) { return u !== S.me.id && sel.indexOf(u) < 0; });
+            if (dropU.length) { var rx = await sb.from(T('wishes')).delete().eq('product_id', id).in('user_id', dropU); if (rx.error) throw rx.error; }
+          }
           if (had[S.me.id] && sel.indexOf(S.me.id) < 0) {   // mich abgewählt: mein Favorit entfällt
             var rd = await sb.from(T('wishes')).delete().eq('product_id', id).eq('user_id', S.me.id); if (rd.error) throw rd.error;
           } else if (had[S.me.id]) {

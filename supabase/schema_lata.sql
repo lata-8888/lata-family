@@ -679,7 +679,8 @@ create policy wishes_select on public."lata-wishes" for select to authenticated
 create policy wishes_update on public."lata-wishes" for update to authenticated
   using (public.lata_is_user() and (user_id = auth.uid() or public.lata_can_see_list(list_id)) and exists (select 1 from public."lata-products" p where p.id = product_id))
   with check (public.lata_can_see_list(list_id));
-create policy wishes_delete on public."lata-wishes" for delete to authenticated using (user_id = auth.uid());   -- Favorit entfernt nur die Person selbst
+create policy wishes_delete on public."lata-wishes" for delete to authenticated
+  using (user_id = auth.uid() or (public.lata_is_admin() and exists (select 1 from public."lata-products" p where p.id = product_id and not p.is_private)));   -- Favorit entfernt die Person selbst; Admins auch fremde (nicht von privaten Produkten)
 -- Anlegen von Wünschen nur über lata_add_wish (keine insert-Policy)
 
 -- ===== Rechte =====
