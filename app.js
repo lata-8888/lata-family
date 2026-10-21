@@ -129,7 +129,7 @@
   function phoneToEmail(p) { return p.replace('+', '') + '@' + (cfg.EMAIL_DOMAIN || 'phone-login.app'); }
 
   /* ---------- Zustand ---------- */
-  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], modules: {}, shopViews: {}, tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
+  var S = { step: 'login', err: '', busy: false, session: null, me: null, members: [], events: [], resp: [], tasks: [], lists: [], products: [], wishes: [], rules: [], gastros: [], shopViews: {}, tab: 'events', sec: { 'need-others': false, 'need-catalog': false }, open: {}, phone: '' };
   // Admin: alle Teilbereiche sind beim Öffnen eingeklappt
   var ADMIN_KEYS = ['events', 'members', 'recur', 'design', 'lang', 'a-tasks', 'gastro', 'g-user', 'g-guest'];
   ADMIN_KEYS.forEach(function (k) { S.sec[k] = false; });
@@ -345,9 +345,9 @@
     S.assign = ra.data || [];
     S.members = r[0].data; S.events = r[1].data; S.resp = r[2].data; S.tasks = r[5].data; S.lists = r[6].data; S.products = r[7].data; S.rules = r[8].data; S.wishes = r[9].data || [];
     adminDesign = DESIGNS.some(function (x) { return x.id === r[3].data; }) ? r[3].data : 'standard';
-    var rm = await sb.rpc(F('modules'));
-    if (rm.error) console.error(rm.error);   // ältere Datenbank ohne Module: keine Zusatzseiten
-    S.modules = rm.error || !rm.data ? {} : rm.data;
+    var rg = await sb.from(T('gastros')).select('*').order('created_at');
+    if (rg.error) console.error(rg.error);   // ältere Datenbank ohne Gastronomien: keine Zusatzseiten
+    S.gastros = rg.error || !rg.data ? [] : rg.data;
     S.defaultLang = LANGS.indexOf(r[4].data) > -1 ? r[4].data : 'de';
     try { localStorage.setItem('app-default-lang' + SFX, S.defaultLang); } catch (e) { /* ignorieren */ }
     S.me = S.members.filter(function (m) { return m.id === uid; })[0] || null;
@@ -789,7 +789,8 @@
   // lata-products: ein Eintrag je Produkt. lata-wishes: eine Person führt ein Produkt auf ihrer Wunschliste (Notiz, Liste, ausgewählt, abgehakt).
   // Eine Zeile in der Oberfläche heisst «Item»: { p: Produkt, w: mein Wunsch oder null, ws: Wünsche der Zeile, listId }
   // Einkauf und «Il Mio Quattro» sind zwei Seiten mit demselben Aufbau, aber eigenem Produktkatalog und eigenen Einkaufslisten (Spalte shop)
-  function shopKey() { return S.tab === 'ilmio' ? 'ilmio' : 'einkauf'; }
+  function shopKey() { return String(S.tab).indexOf('g:') === 0 ? S.tab.slice(2) : 'einkauf'; }   // Reiter «g:<key>» = Gastronomie, sonst Einkauf
+  function shopTitle() { var k = shopKey(), g = S.gastros.filter(function (x) { return x.key === k; })[0]; return g ? g.name : L('navShop'); }
   function inShop(x) { return !!x && (x.shop || 'einkauf') === shopKey(); }
   function shopProds() { return S.products.filter(inShop); }
   function shopLists() { return S.lists.filter(inShop); }
@@ -872,7 +873,7 @@
   function ulOf(rows, emptyKey) { return rows.length ? '<ul class="list">' + rows.join('') + '</ul>' : '<p class="muted">' + esc(L(emptyKey)) + '</p>'; }
   function viewShop() {
     var needView = curShopView() !== 'lists';
-    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(L(shopKey() === 'ilmio' ? 'navIlMio' : 'navShop')) + '</h1></div>' +
+    var html = '<div class="top"><div><h1 class="pagetitle">' + esc(shopTitle()) + '</h1></div>' +
       (needView ? '<button type="button" class="hico addbtn" data-act="need-new" aria-label="' + esc(L('shAdd')) + '" title="' + esc(L('shAdd')) + '">' + ICON.plus + '</button>' : '<button type="button" class="hico addbtn" data-act="list-new" aria-label="' + esc(L('shListAdd')) + '" title="' + esc(L('shListAdd')) + '">' + ICON.plus + '</button>') + '</div>';
     // zwei Register (Tabs) statt Knöpfe
     var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
@@ -947,9 +948,6 @@
     if (!fr || fr.__extra) return fr;
     return (await resolveListChoice(fr)) ? fr : null;
   }
-
-  // Hauptseite «Il Mio Quattro» (Gastronomie): Klon der Seite «Einkauf» mit eigenem Katalog (Pizzakarte); nur sichtbar, wenn der Admin das Modul aktiviert hat
-  function viewIlMio() { return viewShop(); }
 
   function viewProfile() {
     var opt = function (v, l) { return '<button type="button" class="segbtn' + (theme === v ? ' on' : '') + '" data-act="set-theme" data-val="' + v + '" aria-pressed="' + (theme === v) + '">' + esc(l) + '</button>'; };
@@ -1063,12 +1061,11 @@
         '<span class="nm"><b>' + esc(L('design_' + d.id)) + '</b><span>' + esc(L('design_' + d.id + '_d')) + '</span></span>' +
         (on ? '<span class="ok">' + ICON.check + '</span>' : '') + '</button>';
     }).join('');
-    // Hauptgruppe «Gastronomie»: je Eintrag ein Schalter, der die zugehörige Hauptseite ein-/ausblendet
-    var sw = function (key, label) {
-      var on = !!S.modules[key];
-      return '<li class="modrow"><div class="l"><b>' + esc(label) + '</b></div><button type="button" role="switch" class="switch' + (on ? ' on' : '') + '" data-act="module" data-id="' + key + '" data-val="' + (on ? '0' : '1') + '" aria-checked="' + on + '" aria-label="' + esc(label) + '"><i></i></button></li>';
-    };
-    html += accordion('gastro', L('adminGastro'), null, '<ul class="list">' + sw('il_mio_quattro', L('navIlMio')) + '</ul>');
+    // Hauptgruppe «Gastronomie»: je Gastronomie ein Schalter, der ihre Hauptseite (Klon des Einkaufs mit eigenem Katalog) ein-/ausblendet
+    var gBody = S.gastros.length ? '<ul class="list">' + S.gastros.map(function (g) {
+      return '<li class="modrow"><div class="l"><b>' + esc(g.name) + '</b></div><button type="button" role="switch" class="switch' + (g.enabled ? ' on' : '') + '" data-act="gastro" data-id="' + esc(g.key) + '" data-val="' + (g.enabled ? '0' : '1') + '" aria-checked="' + !!g.enabled + '" aria-label="' + esc(g.name) + '"><i></i></button></li>';
+    }).join('') + '</ul>' : '<p class="muted">' + esc(L('gastroEmpty')) + '</p>';
+    html += accordion('gastro', L('adminGastro'), S.gastros.length, gBody, 'gastro-add', L('gastroAdd'));
     html += accordion('design', L('designDefault'), null, dsg);
     // Standardsprache der App (nur Admins); Personen können sie im Profil überschreiben
     var lng = '<p class="muted small" style="margin-bottom:10px">' + esc(L('langHint')) + '</p>' + LANGS.map(function (l) {
@@ -1113,13 +1110,14 @@
     if (S.step === 'login') { app.innerHTML = viewLogin(); nav.hidden = true; return; }
     // Reihenfolge wie in der FBRO-App: Profil steht ganz rechts
     var tabs = [{ id: 'events', label: L('navEvents'), icon: ICON.cal }, { id: 'tasks', label: L('navTasks'), icon: ICON.tasks }, { id: 'shop', label: L('navShop'), icon: ICON.cart }];
-    if (S.modules.il_mio_quattro) tabs.push({ id: 'ilmio', label: L('navIlMio'), icon: ICON.food });   // Hauptseite nur, wenn im Admin (Gastronomie) aktiviert
+    // je aktivierter Gastronomie (Admin → Gastronomie) eine Hauptseite mit eigenem Katalog
+    S.gastros.forEach(function (g) { if (g.enabled) tabs.push({ id: 'g:' + g.key, label: g.name, icon: ICON.food }); });
     if (canManageEvents()) tabs.push({ id: 'admin', label: L('navAdmin'), icon: ICON.gear });
     tabs.push({ id: 'profile', label: L('navProfile'), icon: ICON.user });
     if (!tabs.some(function (t) { return t.id === S.tab; })) S.tab = 'events';
     var open = Array.prototype.map.call(document.querySelectorAll('details.ccel[open]'), function (d) { return d.dataset.k; });
     var banner = S.me.pin_changed ? '' : '<div class="pinbanner" role="status">' + esc(L('pinBanner')) + ' <button class="chip" data-act="goto" data-val="profile">' + esc(L('changePin')) + '</button></div>';
-    var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : S.tab === 'ilmio' ? viewIlMio() : S.tab === 'tasks' ? viewTasks() : S.tab === 'shop' ? viewShop() : viewEvents();
+    var body = S.tab === 'profile' ? viewProfile() : S.tab === 'admin' ? viewAdmin() : String(S.tab).indexOf('g:') === 0 ? viewShop() : S.tab === 'tasks' ? viewTasks() : S.tab === 'shop' ? viewShop() : viewEvents();
     app.innerHTML = banner + '<div class="shell">' + body + '</div>';
     nav.hidden = false;
     var bd = badges();
@@ -1584,7 +1582,13 @@
           if (r.error) throw r.error;
         });
       }
-      case 'module': if (isAdmin()) { if (!!S.modules[id] === (v === '1')) return; return rpc('set_module', { p_key: id, p_on: v === '1' }, L('saved')); } return;
+      case 'gastro': if (isAdmin()) return rpc('set_gastro', { p_key: id, p_on: v === '1' }, L('saved')); return;
+      case 'gastro-add': {
+        if (!isAdmin()) return;
+        var gf = await askForm(L('gastroAdd'), [{ name: 'name', label: L('gastroName') }]);
+        if (!gf || !gf.name) return;
+        return rpc('add_gastro', { p_name: gf.name }, L('saved'));
+      }
       case 'applang': if (isAdmin() && v !== S.defaultLang) return rpc('set_app_language', { p_lang: v }, L('langSaved')); return;
       case 'design': if (isAdmin() && v !== adminDesign) return rpc('set_app_design', { p_design: v }, L('designSaved')); return;
       case 'em': return rpc('set_event_manager', { target: id, flag: v === 'true' }, L('saved'));

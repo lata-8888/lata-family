@@ -111,6 +111,14 @@ create table if not exists public."lata-shop_lists" (
   created_at timestamptz not null default now()
 );
 alter table public."lata-shop_lists" add column if not exists shop text not null default 'einkauf';
+-- Gastronomien: je eine Hauptseite (Klon des Einkaufs) mit eigenem Produktkatalog (lata-products.shop = key); der Admin schaltet sie ein
+create table if not exists public."lata-gastros" (
+  key text primary key check (key ~ '^[a-z0-9_]{2,30}$' and key <> 'einkauf'),
+  name text not null check (char_length(name) between 1 and 60),
+  enabled boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 -- Produktkatalog: jedes Produkt genau einmal (Name ohne Gross-/Kleinschreibung und Randleerzeichen eindeutig)
 create table if not exists public."lata-products" (
   id uuid primary key default gen_random_uuid(),
@@ -130,8 +138,10 @@ alter table public."lata-products" add column if not exists price numeric(8,2);
 alter table public."lata-products" add column if not exists is_private boolean not null default false;
 drop index if exists public."lata-products_name_key";
 -- öffentlich global eindeutig, privat je Person eindeutig
-create unique index if not exists "lata-products_name_pub_key"  on public."lata-products" (lower(btrim(name))) where not is_private;
-create unique index if not exists "lata-products_name_priv_key" on public."lata-products" (lower(btrim(name)), created_by) where is_private;
+drop index if exists public."lata-products_name_pub_key";    -- früher global eindeutig, jetzt je Seite (Einkauf / Gastronomie)
+drop index if exists public."lata-products_name_priv_key";
+create unique index if not exists "lata-products_shop_name_pub"  on public."lata-products" (shop, lower(btrim(name))) where not is_private;
+create unique index if not exists "lata-products_shop_name_priv" on public."lata-products" (shop, lower(btrim(name)), created_by) where is_private;
 
 -- Wunscheintrag: eine Person führt ein Produkt auf ihrer Wunschliste, optional in einer Einkaufsliste
 create table if not exists public."lata-wishes" (
@@ -458,7 +468,7 @@ language plpgsql security definer set search_path = public as $$
 declare me uuid := auth.uid(); nm text := btrim(coalesce(p_name, '')); pid uuid; u uuid; users uuid[]; pub boolean; priv boolean := coalesce(p_private, false);
 begin
   if not public.lata_is_user() then raise exception 'Nicht angemeldet'; end if;
-  if p_shop not in ('einkauf', 'ilmio') then raise exception 'Unbekannte Seite'; end if;
+  if p_shop <> 'einkauf' and not exists (select 1 from public."lata-gastros" where key = p_shop) then raise exception 'Unbekannte Seite'; end if;
   if char_length(nm) not between 1 and 80 then raise exception 'Name fehlt'; end if;
   if not public.lata_can_see_list(p_list) then raise exception 'NEED_FORBIDDEN'; end if;
   pub := not priv and (p_list is null or exists (select 1 from public."lata-shop_lists" where id = p_list and not is_private));
@@ -492,18 +502,25 @@ begin
   return n;
 end; $$;
 
--- Module (Hauptseiten, die der Admin ein-/ausschaltet): Schlüssel «module_<name>» in lata-app_settings, Wert '1' = an
-create or replace function public.lata_modules() returns jsonb
-language sql stable security definer set search_path = public as $$
-  select coalesce((select jsonb_object_agg(substr(key, 8), value = '1') from public."lata-app_settings" where key like 'module\_%'), '{}'::jsonb)
-$$;
-create or replace function public.lata_set_module(p_key text, p_on boolean) returns void
+-- Gastronomien verwalten (nur Admins)
+create or replace function public.lata_set_gastro(p_key text, p_on boolean) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   if not public.lata_is_admin() then raise exception 'Nur Admins'; end if;
-  if p_key not in ('il_mio_quattro') then raise exception 'Unbekanntes Modul'; end if;
-  insert into public."lata-app_settings" (key, value) values ('module_' || p_key, case when p_on then '1' else '0' end)
-  on conflict (key) do update set value = excluded.value;
+  update public."lata-gastros" set enabled = coalesce(p_on, false) where key = p_key;
+  if not found then raise exception 'Unbekannte Gastronomie'; end if;
+end; $$;
+create or replace function public.lata_add_gastro(p_name text) returns text
+language plpgsql security definer set search_path = public as $$
+declare nm text := btrim(coalesce(p_name, '')); k text; n int := 1;
+begin
+  if not public.lata_is_admin() then raise exception 'Nur Admins'; end if;
+  if char_length(nm) not between 1 and 60 then raise exception 'Name fehlt'; end if;
+  k := left(coalesce(nullif(regexp_replace(lower(nm), '[^a-z0-9]+', '_', 'g'), ''), 'gastro'), 24);
+  k := btrim(k, '_'); if char_length(k) < 2 then k := 'gastro'; end if;
+  while exists (select 1 from public."lata-gastros" where key = k) or k = 'einkauf' loop n := n + 1; k := left(k, 24) || '_' || n; end loop;
+  insert into public."lata-gastros" (key, name, enabled) values (k, nm, false);
+  return k;
 end; $$;
 
 -- ===== RLS =====
@@ -517,6 +534,7 @@ alter table public."lata-task_assignees"   enable row level security;
 alter table public."lata-recurring_tasks"  enable row level security;
 alter table public."lata-shop_lists"       enable row level security;
 alter table public."lata-products"         enable row level security;
+alter table public."lata-gastros"          enable row level security;
 alter table public."lata-wishes"           enable row level security;
 
 do $$ declare r record; begin
@@ -572,6 +590,7 @@ create policy task_assignees_manage on public."lata-task_assignees" for all to a
 
 create policy recurring_admin on public."lata-recurring_tasks" for all to authenticated using (public.lata_is_admin()) with check (public.lata_is_admin());
 
+create policy gastros_select on public."lata-gastros" for select to authenticated using (public.lata_is_user());   -- ändern nur per RPC (Admin)
 create policy shop_lists_select on public."lata-shop_lists" for select to authenticated using (public.lata_is_user() and (not is_private or owner_id = auth.uid()));
 create policy shop_lists_insert on public."lata-shop_lists" for insert to authenticated with check (public.lata_is_user() and owner_id = auth.uid());
 create policy shop_lists_update on public."lata-shop_lists" for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
@@ -622,7 +641,7 @@ grant execute on function public.lata_app_design(), public.lata_app_language() t
 -- ===== Realtime =====
 do $$ declare t text; begin
   foreach t in array array['lata-profiles','lata-events','lata-event_assignees','lata-event_responses','lata-tasks',
-                           'lata-recurring_tasks','lata-shop_lists','lata-products','lata-wishes','lata-task_assignees'] loop
+                           'lata-recurring_tasks','lata-shop_lists','lata-products','lata-wishes','lata-task_assignees','lata-gastros'] loop
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
       execute format('alter publication supabase_realtime add table public.%I', t);
     end if;
