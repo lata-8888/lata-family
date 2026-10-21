@@ -1,6 +1,7 @@
 /* Übersetzungen (Deutsch, Englisch, Niederländisch). Alle Sprachen MÜSSEN dieselben Schlüssel haben – tools/check.js prüft das. */
 window.APP_DICT = {
   de: {
+    navGastro: 'Gastro',
     shQtyLess: 'Weniger', shQtyMore: 'Mehr', shTotals: 'Anzahl: {n} · Total: {sum}', shGrand: 'Gesamt',
     gastroAdd: 'Gastronomie hinzufügen', gastroName: 'Name', gastroEmpty: 'Noch keine Gastronomie.',
     adminGastro: 'Gastronomie',
@@ -65,6 +66,7 @@ window.APP_DICT = {
     recMissing: 'Titel, Person und Beginn sind Pflicht.', recHint: 'Neue Tasks entstehen automatisch, sobald jemand die App öffnet.'
   },
   en: {
+    navGastro: 'Gastro',
     shQtyLess: 'Fewer', shQtyMore: 'More', shTotals: 'Count: {n} · Total: {sum}', shGrand: 'Total',
     gastroAdd: 'Add gastronomy', gastroName: 'Name', gastroEmpty: 'No gastronomy yet.',
     adminGastro: 'Gastronomy',
@@ -129,6 +131,7 @@ window.APP_DICT = {
     recMissing: 'Title, person and start are required.', recHint: 'New tasks are created automatically as soon as someone opens the app.'
   },
   nl: {
+    navGastro: 'Gastro',
     shQtyLess: 'Minder', shQtyMore: 'Meer', shTotals: 'Aantal: {n} · Totaal: {sum}', shGrand: 'Totaal',
     gastroAdd: 'Gastronomie toevoegen', gastroName: 'Naam', gastroEmpty: 'Nog geen gastronomie.',
     adminGastro: 'Gastronomie',

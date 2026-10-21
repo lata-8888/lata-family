@@ -1128,7 +1128,7 @@
     // Reihenfolge wie in der FBRO-App: Profil steht ganz rechts
     var tabs = [{ id: 'events', label: L('navEvents'), icon: ICON.cal }, { id: 'tasks', label: L('navTasks'), icon: ICON.tasks }, { id: 'shop', label: L('navShop'), icon: ICON.cart }];
     // je aktivierter Gastronomie (Admin → Gastronomie) eine Hauptseite mit eigenem Katalog
-    S.gastros.forEach(function (g) { if (g.enabled) tabs.push({ id: 'g:' + g.key, label: g.name, icon: ICON.food }); });
+    S.gastros.forEach(function (g) { if (g.enabled) tabs.push({ id: 'g:' + g.key, label: L('navGastro'), full: g.name, icon: ICON.food }); });   // Fussleiste: «Gastro», der Name steht auf der Seite
     if (canManageEvents()) tabs.push({ id: 'admin', label: L('navAdmin'), icon: ICON.gear });
     tabs.push({ id: 'profile', label: L('navProfile'), icon: ICON.user });
     if (!tabs.some(function (t) { return t.id === S.tab; })) S.tab = 'events';
@@ -1143,7 +1143,7 @@
       if (t.id === 'events' && bd.events) { mark = '<i class="dot"></i>'; hint = L('badgeEvToday'); }
       if (t.id === 'tasks' && bd.tasks) { mark = '<b class="cnt">' + (bd.tasks > 9 ? '9+' : bd.tasks) + '</b>'; hint = L('badgeTasks', { n: bd.tasks }); }
       if (t.id === 'admin' && bd.admin) { mark = '<i class="dot"></i>'; hint = L('badgeAdmin'); }
-      return '<button class="tab' + (t.id === S.tab ? ' on' : '') + '" data-act="goto" data-val="' + t.id + '" aria-current="' + (t.id === S.tab) + '"' + (hint ? ' aria-label="' + esc(t.label + ': ' + hint) + '"' : '') + '><span class="tic">' + t.icon + mark + '</span><span>' + esc(t.label) + '</span></button>';
+      return '<button class="tab' + (t.id === S.tab ? ' on' : '') + '" data-act="goto" data-val="' + t.id + '" aria-current="' + (t.id === S.tab) + '"' + (hint ? ' aria-label="' + esc(t.label + ': ' + hint) + '"' : t.full ? ' aria-label="' + esc(t.full) + '" title="' + esc(t.full) + '"' : '') + '><span class="tic">' + t.icon + mark + '</span><span>' + esc(t.label) + '</span></button>';
     }).join('');
     setAppBadge(bd.total);
     open.forEach(function (k) { var d = document.querySelector('details.ccel[data-k="' + k + '"]'); if (d) d.open = true; });
