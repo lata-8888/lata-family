@@ -51,6 +51,7 @@
     { id: 'light', colors: ['#4A5568', '#EDEFF2', '#FBFBFC'] },
     { id: 'standard', colors: ['#307CC0', '#E3EFF9', '#F3F4F0'] },
     { id: 'petrol', colors: ['#0E5F6F', '#2BAFC4', '#EAF4F6'] },
+    { id: 'lila', colors: ['#6D28D9', '#A78BFA', '#F6F1FD'] },
     { id: 'holland', colors: ['#EA580C', '#F97316', '#FFF7ED'] }
   ];
   var design = 'standard';        // wirksames Design (eigene Wahl, sonst Standard des Admins)

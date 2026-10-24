@@ -262,6 +262,15 @@ p{margin:0}
 :root[data-design="petrol"][data-theme="dark"]{--bg:#061519;--surface:#0C262D;--ink:#E2F3F6;--muted:#8FB6BF;--line:#17404A;--crown:#5CCADB;--crown-soft:#0E2F37;--btn-bg:#2BAFC4;--btn-fg:#04181D;--yes:#5CD08A;--yes-soft:#17382A;--no:#FF8A80;--no-soft:#43211F;--focus:#5CCADB}
 :root[data-design="petrol"] body::before{content:"";display:block;height:6px;background:linear-gradient(90deg,#0E5F6F,#2BAFC4)}
 :root[data-design="petrol"] .cceh,:root[data-design="petrol"] .acch{background:var(--crown-soft);border-left:4px solid var(--crown)}
+
+/* Lila: sattes Violett, zarte Flieder-Flächen, weiche Formen */
+:root[data-design="lila"]{--bg:#F6F1FD;--surface:#fff;--ink:#2A1245;--muted:#6B5A82;--line:#E3D6F2;--crown:#6D28D9;--crown-soft:#EDE3FB;--btn-bg:#7C3AED;--btn-fg:#fff;--yes:#2E7D32;--yes-soft:#E1F2E2;--no:#B3261E;--no-soft:#FBE4E1;--focus:#7C3AED;
+  --r-card:16px;--r-btn:12px;--head-ls:0}
+@media(prefers-color-scheme:dark){:root[data-design="lila"]:not([data-theme="light"]){--bg:#150B24;--surface:#20123A;--ink:#F1E8FF;--muted:#B9A5D6;--line:#38235A;--crown:#C4B5FD;--crown-soft:#2B1A4A;--btn-bg:#A78BFA;--btn-fg:#150B24;--yes:#5CD08A;--yes-soft:#17382A;--no:#FF8A80;--no-soft:#43211F;--focus:#C4B5FD}}
+:root[data-design="lila"][data-theme="dark"]{--bg:#150B24;--surface:#20123A;--ink:#F1E8FF;--muted:#B9A5D6;--line:#38235A;--crown:#C4B5FD;--crown-soft:#2B1A4A;--btn-bg:#A78BFA;--btn-fg:#150B24;--yes:#5CD08A;--yes-soft:#17382A;--no:#FF8A80;--no-soft:#43211F;--focus:#C4B5FD}
+:root[data-design="lila"] body::before{content:"";display:block;height:6px;background:linear-gradient(90deg,#6D28D9,#A78BFA)}
+:root[data-design="lila"] .cceh,:root[data-design="lila"] .acch{background:var(--crown-soft);border-left:4px solid var(--crown)}
+:root[data-design="lila"] .resp,:root[data-design="lila"] .chip,:root[data-design="lila"] .ccp{border-radius:999px}
 .recrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.recrow[hidden]{display:none}.recrow .fld{margin:0}.recrow select{width:100%;min-width:0}
 
 /* Agenda: Monatskalender */
