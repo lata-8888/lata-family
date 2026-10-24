@@ -52,6 +52,7 @@
     { id: 'standard', colors: ['#307CC0', '#E3EFF9', '#F3F4F0'] },
     { id: 'petrol', colors: ['#0E5F6F', '#2BAFC4', '#EAF4F6'] },
     { id: 'lila', colors: ['#6D28D9', '#A78BFA', '#F6F1FD'] },
+    { id: 'italia', colors: ['#008C45', '#CD212A', '#FBF8F1'] },
     { id: 'holland', colors: ['#EA580C', '#F97316', '#FFF7ED'] }
   ];
   var design = 'standard';        // wirksames Design (eigene Wahl, sonst Standard des Admins)
@@ -1025,7 +1026,7 @@
         return '<button type="button" class="segbtn' + (l === lang ? ' on' : '') + '" data-act="set-lang" data-val="' + l + '" aria-pressed="' + (l === lang) + '">' + esc(LANG_NAMES[l]) + '</button>';
       }).join('') + '</div></section>' +
       '<section class="card"><h2>' + esc(L('theme')) + '</h2><div class="segctl">' + opt('light', L('themeLight')) + opt('dark', L('themeDark')) + opt('', L('themeAuto')) + '</div></section>' +
-      '<section class="card"><h2>' + esc(L('designTitle')) + '</h2><div class="segctl">' + DESIGNS.map(function (d) { return '<button type="button" class="segbtn' + (design === d.id ? ' on' : '') + '" data-act="set-design" data-val="' + d.id + '" aria-pressed="' + (design === d.id) + '">' + esc(L('design_' + d.id)) + '</button>'; }).join('') + '</div></section>' +
+      '<section class="card"><h2>' + esc(L('designTitle')) + '</h2><div class="segctl wrap">' + DESIGNS.map(function (d) { return '<button type="button" class="segbtn' + (design === d.id ? ' on' : '') + '" data-act="set-design" data-val="' + d.id + '" aria-pressed="' + (design === d.id) + '">' + esc(L('design_' + d.id)) + '</button>'; }).join('') + '</div></section>' +
       '<section class="card"><h2>' + esc(L('pin')) + '</h2><form data-form="pin">' + fld(L('newPin'), 'pin', 'password', '', 'inputmode="numeric" maxlength="6"') +
       '<button class="btn" type="submit">' + esc(L('changePin')) + '</button></form></section>' +
       '<section class="card"><h2>' + esc(L('installTitle')) + '</h2>' + install + '</section>' +

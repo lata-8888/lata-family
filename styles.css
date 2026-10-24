@@ -63,6 +63,7 @@ p{margin:0}
 .segctl{display:flex;gap:6px}
 .segbtn{flex:1;padding:12px 8px;border:1.5px solid var(--line);border-radius:var(--r-btn);background:var(--surface);color:var(--ink);font-weight:600}
 .segbtn.on{background:var(--crown);color:#fff;border-color:var(--crown)}
+.segctl.wrap{flex-wrap:wrap}.segctl.wrap .segbtn{flex:1 1 28%}
 .pinbanner{background:#FFF3CD;color:#5c4400;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;padding-top:max(10px,env(safe-area-inset-top))}
 
 /* Karten und Abschnitte (Kopfzeile blau getönt wie in der FBRO-App) */
@@ -271,6 +272,15 @@ p{margin:0}
 :root[data-design="lila"] body::before{content:"";display:block;height:6px;background:linear-gradient(90deg,#6D28D9,#A78BFA)}
 :root[data-design="lila"] .cceh,:root[data-design="lila"] .acch{background:var(--crown-soft);border-left:4px solid var(--crown)}
 :root[data-design="lila"] .resp,:root[data-design="lila"] .chip,:root[data-design="lila"] .ccp{border-radius:999px}
+
+/* Italia: Trikolore (Grün, Weiss, Rot), warmes Creme, Serifen-Titel, sachlich */
+:root[data-design="italia"]{--bg:#FBF8F1;--surface:#fff;--ink:#1D2A22;--muted:#66705F;--line:#E6E0D0;--crown:#00794A;--crown-soft:#E5F2EA;--btn-bg:#008C45;--btn-fg:#fff;--yes:#00794A;--yes-soft:#E5F2EA;--no:#CD212A;--no-soft:#FBE6E7;--focus:#CD212A;
+  --r-card:12px;--r-btn:10px;--head-ls:0;--font-head:"Playfair Display",Georgia,"DejaVu Serif",serif}
+@media(prefers-color-scheme:dark){:root[data-design="italia"]:not([data-theme="light"]){--bg:#0F1712;--surface:#17231B;--ink:#F2EFE6;--muted:#A9B5A6;--line:#2B3D31;--crown:#5ED39A;--crown-soft:#1B2F23;--btn-bg:#2FB26F;--btn-fg:#07140D;--yes:#5ED39A;--yes-soft:#1B2F23;--no:#FF7B80;--no-soft:#3C1F21;--focus:#FF7B80}}
+:root[data-design="italia"][data-theme="dark"]{--bg:#0F1712;--surface:#17231B;--ink:#F2EFE6;--muted:#A9B5A6;--line:#2B3D31;--crown:#5ED39A;--crown-soft:#1B2F23;--btn-bg:#2FB26F;--btn-fg:#07140D;--yes:#5ED39A;--yes-soft:#1B2F23;--no:#FF7B80;--no-soft:#3C1F21;--focus:#FF7B80}
+:root[data-design="italia"] body::before{content:"";display:block;height:8px;background:linear-gradient(90deg,#008C45 0 33.33%,#F4F5F0 33.33% 66.66%,#CD212A 66.66% 100%)}
+:root[data-design="italia"] .cceh,:root[data-design="italia"] .acch{background:var(--crown-soft);border-left:4px solid var(--crown)}
+:root[data-design="italia"] .tab.on{background:var(--crown-soft)}
 .recrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.recrow[hidden]{display:none}.recrow .fld{margin:0}.recrow select{width:100%;min-width:0}
 
 /* Agenda: Monatskalender */

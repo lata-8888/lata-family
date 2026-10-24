@@ -23,11 +23,11 @@ create table if not exists public."lata-profiles" (
   is_guest boolean not null default false,
   is_event_manager boolean not null default false,
   is_gastro_manager boolean not null default false,   -- darf Gastronomien ein-/ausschalten und Gäste eröffnen
-  design text check (design is null or design in ('standard','holland','light','petrol','lila'))
+  design text check (design is null or design in ('standard','holland','light','petrol','lila','italia'))
 );
 -- Bestehende Datenbank: Liste um 'lila' erweitern (Constraint ersetzen, siehe upgrade_design_lila.sql)
 alter table public."lata-profiles" drop constraint if exists "lata-profiles_design_check";
-alter table public."lata-profiles" add constraint "lata-profiles_design_check" check (design is null or design in ('standard','holland','light','petrol','lila'));
+alter table public."lata-profiles" add constraint "lata-profiles_design_check" check (design is null or design in ('standard','holland','light','petrol','lila','italia'));
 
 create table if not exists public."lata-events" (
   id uuid primary key default gen_random_uuid(),
@@ -457,7 +457,7 @@ create or replace function public.lata_set_app_design(p_design text) returns voi
 language plpgsql security definer set search_path = public as $$
 begin
   if not public.lata_is_admin() then raise exception 'Nur Admins'; end if;
-  if p_design not in ('standard', 'holland', 'light', 'petrol', 'lila') then raise exception 'Ungültiges Design'; end if;
+  if p_design not in ('standard', 'holland', 'light', 'petrol', 'lila', 'italia') then raise exception 'Ungültiges Design'; end if;
   insert into public."lata-app_settings" (key, value) values ('design', p_design)
   on conflict (key) do update set value = excluded.value;
 end; $$;
