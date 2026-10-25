@@ -707,6 +707,8 @@ do $$ declare f record; begin
     execute format('grant execute on function %s to authenticated', f.sig);
   end loop;
 end $$;
+-- Interne Hilfsfunktion: kein Zugriff für Clients (sonst könnte jede angemeldete Person per RPC Admin-Logins anlegen)
+revoke execute on function public.lata__create_user(text, text, boolean) from public, anon, authenticated;
 -- Vor dem Login nötig (Standard-Design/-Sprache auf dem Login-Bildschirm):
 grant execute on function public.lata_app_design(), public.lata_app_language() to anon;
 
