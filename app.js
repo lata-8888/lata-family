@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   // Version dieser App: bei jeder Auslieferung zusammen mit sw.js (CACHE = 'lata-family-vNN') erhöhen; steht im Profil oben rechts
-  var APP_VERSION = 'v97';
+  var APP_VERSION = 'v98';
 
   /* ---------- Konfiguration & Supabase ---------- */
   var cfg = window.APP_CONFIG || {};
@@ -933,7 +933,9 @@
   function shopBody() {
     var needView = curShopView() !== 'lists';
     var tab = function (v, label) { var on = (v === 'need') === needView; return '<button type="button" role="tab" class="subtab' + (on ? ' on' : '') + '" aria-selected="' + on + '" data-act="shop-view" data-val="' + v + '">' + esc(label) + '</button>'; };
-    return '<div class="subtabs" role="tablist">' + tab('need', L('shNeed')) + tab('lists', L('shLists')) + '</div>' + (needView ? viewNeeds() : viewLists());
+    // Aktualisieren-Knopf rechts im Register: holt alle Daten neu (falls die Live-Aktualisierung am Handy ausgesetzt hat)
+    var refreshBtn = '<button type="button" class="hico subrefresh" data-act="refresh" aria-label="' + esc(L('refreshData')) + '" title="' + esc(L('refreshData')) + '">' + ICON.refresh + '</button>';
+    return '<div class="subtabs" role="tablist">' + tab('need', L('shNeed')) + tab('lists', L('shLists')) + refreshBtn + '</div>' + (needView ? viewNeeds() : viewLists());
   }
   function viewShop() {
     var needView = curShopView() !== 'lists';
@@ -1711,6 +1713,7 @@
         if (!gf || !gf.name) return;
         return rpc('add_gastro', { p_name: gf.name }, L('saved'));
       }
+      case 'refresh': return act(async function () { /* act lädt danach alles neu und zeichnet neu */ }, L('refreshed'));
       case 'gastro-texts': {
         // Intro-/Outro-Text einer Gastronomie (Admin und Food Manager; serverseitig geprüft)
         if (!canManageGastro()) return;
