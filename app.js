@@ -1,6 +1,8 @@
 /* App Template – Vanilla-JS-PWA (kein Build-Schritt). Login per Handynummer + PIN, Events, Admin, Profil. de/en. */
 (function () {
   'use strict';
+  // Version dieser App: bei jeder Auslieferung zusammen mit sw.js (CACHE = 'lata-family-vNN') erhöhen; steht im Profil oben rechts
+  var APP_VERSION = 'v97';
 
   /* ---------- Konfiguration & Supabase ---------- */
   var cfg = window.APP_CONFIG || {};
@@ -169,7 +171,7 @@
           else if (f.type === 'cat') html = '<div class="fld"><span>' + esc(f.label) + '</span><div class="catpick">' + f.options.map(function (o) {
             return '<label class="catopt" style="--c:' + o.c + '"><input type="radio" name="' + f.name + '" value="' + esc(o.v) + '"' + (o.v === (f.value || '') ? ' checked' : '') + '><i></i><em>' + esc(o.l) + '</em></label>';
           }).join('') + '</div></div>';
-          else if (f.type === 'textarea') html = '<label class="fld' + (f.inline !== false ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><textarea name="' + f.name + '" rows="' + (f.inline ? 2 : 3) + '">' + esc(f.value || '') + '</textarea></label>';
+          else if (f.type === 'textarea') html = '<label class="fld' + (f.inline !== false ? ' inl' : '') + '"><span>' + esc(f.label) + '</span><textarea name="' + f.name + '" rows="' + (f.rows || (f.inline ? 2 : 3)) + '"' + (f.max ? ' maxlength="' + f.max + '"' : '') + '>' + esc(f.value || '') + '</textarea></label>';
           else if (f.type === 'multi' && f.chips) html = '<div class="fld"><span>' + esc(f.label) + '</span><div class="catpick">' + f.options.map(function (o, k) {
             return '<label class="catopt" style="--c:' + PCOLORS[k % PCOLORS.length] + '"><input type="checkbox" name="' + f.name + '" value="' + esc(o.v) + '"' + ((f.value || []).indexOf(o.v) > -1 || o.lock ? ' checked' : '') + (o.lock ? ' disabled' : '') + '><i></i><em>' + esc(o.l) + '</em></label>';
           }).join('') + '</div></div>';
@@ -313,6 +315,7 @@
     cart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 10.5h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>',
     refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>',
     edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.4-4.2A8 8 0 1 1 8.2 18.6z"/><path d="M9 9c0 3 2.500 5.500 5.500 5.500l1.300-1.500-2-1-.8.8c-1-.4-1.900-1.300-2.300-2.300l.8-.8-1-2z"/></svg>',
     lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     tasks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/></svg>',
     filter: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>',
@@ -810,6 +813,21 @@
   function inShop(x) { return !!x && (x.shop || 'einkauf') === shopKey(); }
   function shopProds() { return S.products.filter(inShop); }
   function shopLists() { return S.lists.filter(inShop); }
+  // WhatsApp-Bestellung einer Gastronomie-Liste: Intro, offene (nicht abgehakte) Produkte der Liste in Kartenreihenfolge, Outro
+  function waMessage(listId) {
+    var g = S.gastros.filter(function (x) { return x.key === shopKey(); })[0] || {};
+    var sel = S.wishes.filter(function (w) { return w.selected && w.list_id === listId && inShop(productById(w.product_id)); });
+    var items = groupItems(sel, listId).filter(function (it) { return !it.ws.every(function (x) { return x.checked; }); });
+    var order = grpOrder(), gi = function (it) { var k = order.indexOf(it.p.grp); return k < 0 ? 1e6 : k; };
+    items.sort(function (x, y) { return gi(x) - gi(y) || ordOf(x.p) - ordOf(y.p) || byItem(x, y); });
+    var lines = items.map(function (it) {
+      var n = it.ws.reduce(function (s, w) { return s + wQty(w); }, 0), notes = [];
+      it.ws.forEach(function (w) { if (w.note && notes.indexOf(w.note) < 0) notes.push(w.note); });
+      return n + '× ' + it.p.name + (it.p.ref ? ' (' + L('waNr') + ' ' + it.p.ref + ')' : '') + (notes.length ? ' – ' + notes.join(', ') : '');
+    });
+    if (!lines.length) return '';
+    return [g.intro || '', lines.join('\n'), g.outro || ''].filter(function (x) { return x; }).join('\n\n');
+  }
   function curShopView() { return S.shopViews[shopKey()] === 'lists' ? 'lists' : 'need'; }
   function listById(id) { return S.lists.filter(function (x) { return x.id === id; })[0] || null; }
   function byName(a, b) { return a.name.localeCompare(b.name, LOCALE[lang]); }
@@ -928,7 +946,9 @@
     enabledGastros().forEach(function (g) {
       S.shopCtx = g.key;
       var lists = curShopView() === 'lists';
-      html += '<div data-shop="' + esc(g.key) + '">' + accordion('gs-' + g.key, g.name, null, shopBody(), lists ? 'list-new' : 'need-new', L(lists ? 'shListAdd' : 'shAdd')) + '</div>';
+      // Stift links vom Pfeil: Intro-/Outro-Text der Gastronomie (Admin und Food Manager)
+      var txtBtn = canManageGastro() ? '<button type="button" class="hico" data-act="gastro-texts" data-id="' + esc(g.key) + '" aria-label="' + esc(L('gastroTexts')) + '" title="' + esc(L('gastroTexts')) + '">' + ICON.edit + '</button>' : '';
+      html += '<div data-shop="' + esc(g.key) + '">' + accordion('gs-' + g.key, g.name, null, shopBody(), lists ? 'list-new' : 'need-new', L(lists ? 'shListAdd' : 'shAdd'), txtBtn) + '</div>';
     });
     S.shopCtx = saved;
     return html;
@@ -958,7 +978,8 @@
       html += '<section class="acc"><div class="acch">' +
         '<button type="button" class="acct" data-act="sec" data-id="lst-' + l.id + '" aria-expanded="' + open + '">' + lockIcon(l) + esc(l.name) + ' <span class="cnt">(' + itemsOpen.length + ')</span>' +
         '</button>' +
-        dots + '<button type="button" class="hico" data-act="list-update" data-id="' + l.id + '" aria-label="' + esc(L('shUpdate')) + '" title="' + esc(L('shUpdate')) + '">' + ICON.refresh + '</button>' +
+        dots + (gastro ? '<button type="button" class="hico" data-act="list-wa" data-id="' + l.id + '" aria-label="' + esc(L('waTitle')) + '" title="' + esc(L('waTitle')) + '">' + ICON.chat + '</button>' : '') +
+        '<button type="button" class="hico" data-act="list-update" data-id="' + l.id + '" aria-label="' + esc(L('shUpdate')) + '" title="' + esc(L('shUpdate')) + '">' + ICON.refresh + '</button>' +
         '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="lst-' + l.id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button></div>' +
         (open ? '<div class="accbody">' + (itemsOpen.length || !itemsDone.length ? ulOf(itemsOpen.map(function (it) { return needRow(it, 'list'); }), 'shEmpty') : '') +
           (itemsDone.length ? '<ul class="list">' + itemsDone.map(function (it) { return needRow(it, 'list'); }).join('') + '</ul>' : '') + (gastro ? totalsLine(items) : '') + '</div>' : '') + '</section>';
@@ -1017,7 +1038,7 @@
     var install = standalone ? '<p class="muted">' + esc(L('installDone')) + '</p>'
       : installEvt ? '<p class="muted">' + esc(L('installHint')) + '</p><button class="btn" data-act="install">' + esc(L('installBtn')) + '</button>'
       : '<p class="muted">' + esc(ios ? L('installIos') : L('installHint')) + '</p>';
-    return '<div class="top"><div><h1 class="pagetitle">' + esc(L('navProfile')) + '</h1></div></div>' +
+    return '<div class="top" style="align-items:center"><div><h1 class="pagetitle">' + esc(L('navProfile')) + '</h1></div><span class="appver" title="' + esc(L('appVersion')) + '">' + esc(APP_VERSION) + '</span></div>' +
       '<section class="card"><h2>' + esc(L('myAccount')) + '</h2>' +
       '<button type="button" class="profrow" data-act="edit-name"><span class="muted">' + esc(L('fullName')) + '</span><b>' + esc(S.me.name) + '</b>' + ICON.edit + '</button>' +
       '<button type="button" class="profrow" data-act="edit-phone"><span class="muted">' + esc(L('phone')) + '</span><b>' + esc(fmtPhone(S.me.phone)) + '</b>' + ICON.edit + '</button>' +
@@ -1148,11 +1169,12 @@
   }
 
   // Abschnitt mit Titel (klappt auf/zu), «+»-Knopf und Pfeil ganz rechts – wie in der FBRO-App
-  function accordion(id, title, count, body, addAct, addLabel) {
+  // extraHtml (optional): weitere Symbol-Knöpfe, stehen direkt links vom Auf-/Zuklapp-Pfeil
+  function accordion(id, title, count, body, addAct, addLabel, extraHtml) {
     var open = S.sec[id] !== false;   // standardmässig offen
     return '<section class="acc"><div class="acch">' +
       '<button type="button" class="acct" data-act="sec" data-id="' + id + '" aria-expanded="' + open + '">' + esc(title) + (count == null ? '' : ' <span class="cnt">(' + count + ')</span>') + '</button>' +
-      (addAct ? '<button type="button" class="hico" data-act="' + addAct + '" aria-label="' + esc(addLabel) + '" title="' + esc(addLabel) + '">' + ICON.plus + '</button>' : '') +
+      (addAct ? '<button type="button" class="hico" data-act="' + addAct + '" aria-label="' + esc(addLabel) + '" title="' + esc(addLabel) + '">' + ICON.plus + '</button>' : '') + (extraHtml || '') +
       '<button type="button" class="accfold' + (open ? ' open' : '') + '" data-act="sec" data-id="' + id + '" aria-hidden="true" tabindex="-1">' + ICON.chev + '</button>' +
       '</div>' + (open ? '<div class="accbody">' + body + '</div>' : '') + '</section>';
   }
@@ -1688,6 +1710,27 @@
         var gf = await askForm(L('gastroAdd'), [{ name: 'name', label: L('gastroName') }]);
         if (!gf || !gf.name) return;
         return rpc('add_gastro', { p_name: gf.name }, L('saved'));
+      }
+      case 'gastro-texts': {
+        // Intro-/Outro-Text einer Gastronomie (Admin und Food Manager; serverseitig geprüft)
+        if (!canManageGastro()) return;
+        var gt = S.gastros.filter(function (x) { return x.key === id; })[0]; if (!gt) return;
+        var tf = await askForm(L('gastroTexts') + ': ' + gt.name, [
+          { name: 'intro', label: L('gastroIntro'), type: 'textarea', inline: false, rows: 4, max: 1000, value: gt.intro || '' },
+          { name: 'outro', label: L('gastroOutro'), type: 'textarea', inline: false, rows: 4, max: 1000, value: gt.outro || '' },
+          { type: 'note', text: L('gastroTextsHint') }
+        ]);
+        if (!tf) return;
+        return rpc('set_gastro_texts', { p_key: id, p_intro: tf.intro, p_outro: tf.outro }, L('saved'));
+      }
+      case 'list-wa': {
+        // WhatsApp-Nachricht: Intro + Einkaufsliste + Outro; vor dem Senden noch änderbar
+        var waText = waMessage(id);
+        if (!waText) return toast(L('waEmpty'));
+        var wf = await askForm(L('waTitle'), [{ name: 'msg', label: '', type: 'textarea', inline: false, rows: 12, value: waText }], L('waOpen'), L('waHint'));
+        if (!wf || !wf.msg) return;
+        window.open('https://wa.me/?text=' + encodeURIComponent(wf.msg), '_blank', 'noopener');
+        return;
       }
       case 'applang': if (isAdmin() && v !== S.defaultLang) return rpc('set_app_language', { p_lang: v }, L('langSaved')); return;
       case 'design': if (isAdmin() && v !== adminDesign) return rpc('set_app_design', { p_design: v }, L('designSaved')); return;
