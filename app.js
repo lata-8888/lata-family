@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   // Version dieser App: bei jeder Auslieferung zusammen mit sw.js (CACHE = 'lata-family-vNN') erhöhen; steht im Profil oben rechts
-  var APP_VERSION = 'v98';
+  var APP_VERSION = 'v99';
 
   /* ---------- Konfiguration & Supabase ---------- */
   var cfg = window.APP_CONFIG || {};
@@ -1410,9 +1410,9 @@
       { name: 'title', label: L('evTitle'), value: ev && ev.title, inline: true },
       { name: 'allday', label: L('evAllDay'), type: 'checkbox', value: !!ev && ev.time_set === false, hides: ['time', 'end_time'] },
       { name: 'date', label: L('evTime'), type: 'date', value: local[0], inline: true, pair: 1 },
-      { name: 'time', label: '', type: 'time', value: ev && ev.time_set === false ? '' : local[1], step: 1800, inline: true, pair: 1 },   // ganztägig: keine Zeit vorbelegen
+      { name: 'time', label: '', type: 'time', value: ev && ev.time_set === false ? '' : local[1], step: 60, inline: true, pair: 1 },   // ganztägig: keine Zeit vorbelegen
       { name: 'end_date', label: L('evEndDate'), type: 'date', value: ev ? endLocal[0] : local[0], inline: true, pair: 2 },
-      { name: 'end_time', label: '', type: 'time', value: ev ? (ev.end_time_set ? endLocal[1] : '') : defEnd, step: 1800, inline: true, pair: 2 },
+      { name: 'end_time', label: '', type: 'time', value: ev ? (ev.end_time_set ? endLocal[1] : '') : defEnd, step: 60, inline: true, pair: 2 },
       favPeopleField(haveEv, true),
       (!ev || ev.created_by === S.me.id) ? privField(ev) : null,
       { name: 'rsvp', label: L('evRsvp'), type: 'checkbox', value: ev ? ev.rsvp !== false : false, half: true },
