@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   // Version dieser App: bei jeder Auslieferung zusammen mit sw.js (CACHE = 'lata-family-vNN') erhöhen; steht im Profil oben rechts
-  var APP_VERSION = 'v99';
+  var APP_VERSION = 'v100';
 
   /* ---------- Konfiguration & Supabase ---------- */
   var cfg = window.APP_CONFIG || {};
@@ -813,6 +813,8 @@
   function inShop(x) { return !!x && (x.shop || 'einkauf') === shopKey(); }
   function shopProds() { return S.products.filter(inShop); }
   function shopLists() { return S.lists.filter(inShop); }
+  // Anzeigename: bei «Zum Siam» steht die ID der Karte in eckigen Klammern davor, z. B. «[20] Baozi»
+  function dispName(p) { return p.shop === 'zum_siam' && p.ref ? '[' + p.ref + '] ' + p.name : p.name; }
   // WhatsApp-Bestellung einer Gastronomie-Liste: Intro, offene (nicht abgehakte) Produkte der Liste in Kartenreihenfolge, Outro
   function waMessage(listId) {
     var g = S.gastros.filter(function (x) { return x.key === shopKey(); })[0] || {};
@@ -823,7 +825,7 @@
     var lines = items.map(function (it) {
       var n = it.ws.reduce(function (s, w) { return s + wQty(w); }, 0), notes = [];
       it.ws.forEach(function (w) { if (w.note && notes.indexOf(w.note) < 0) notes.push(w.note); });
-      return n + '× ' + it.p.name + (it.p.ref ? ' (' + L('waNr') + ' ' + it.p.ref + ')' : '') + (notes.length ? ' – ' + notes.join(', ') : '');
+      return n + '× ' + dispName(it.p) + (it.p.ref && it.p.shop !== 'zum_siam' ? ' (' + L('waNr') + ' ' + it.p.ref + ')' : '') + (notes.length ? ' – ' + notes.join(', ') : '');
     });
     if (!lines.length) return '';
     return [g.intro || '', lines.join('\n'), g.outro || ''].filter(function (x) { return x; }).join('\n\n');
@@ -905,7 +907,7 @@
     var counter = gfav ? '<div class="qtyline"><button type="button" class="qb" data-act="need-qty" data-id="' + it.p.id + '" data-val="-1" aria-label="' + esc(L('shQtyLess')) + '"' + (cur <= 0 ? ' disabled' : '') + '>−</button><i class="qn" aria-live="polite">' + cur + '</i><button type="button" class="qb" data-act="need-qty" data-id="' + it.p.id + '" data-val="1" aria-label="' + esc(L('shQtyMore')) + '"' + (cur >= 99 ? ' disabled' : '') + '>+</button></div>' : '';
     var qtyN = shop ? it.ws.reduce(function (s, w) { return s + wQty(w); }, 0) : 0;
     return '<li class="trow shopi' + ((fav ? it.w.checked : shop && bought) ? ' chk' : '') + '">' +
-      '<div class="l"><b>' + (isGastro() && shop ? qtyN + '× ' : '') + lockIcon(it.p) + esc(it.p.name) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
+      '<div class="l"><b>' + (isGastro() && shop ? qtyN + '× ' : '') + lockIcon(it.p) + esc(dispName(it.p)) + '</b><span>' + needMeta(it, mode) + '</span></div>' +
       '<div class="btnrow">' + menu + star + '</div>' + (gfav ? counter : (check || '<span class="tspace" aria-hidden="true"></span>')) + '</li>';
   }
   // Gastronomie: Produkte nach Gruppe (Rubrik der Speisekarte) geordnet mit Überschrift; Gruppen in Kartenreihenfolge (kleinste Nummer), darin nach Nummer, sonst Name
